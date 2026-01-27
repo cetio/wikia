@@ -1,0 +1,16 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/akashi
+akashi.so
+akashi.dylib
+akashi.dll
+akashi.a
+akashi.lib
+akashi-test-*
+*.exe
+*.pdb
+*.o
+*.obj
+*.lst
