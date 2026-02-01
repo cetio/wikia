@@ -231,7 +231,7 @@ unittest
     bool hasCoordinates = false;
     foreach (d; deps)
     {
-        if (!d.x.isNaN && !d.y.isNaN)
+        if (!(d.x is double.nan) && !(d.y is double.nan))
         {
             hasCoordinates = true;
             break;

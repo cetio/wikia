@@ -104,9 +104,9 @@ unittest
 unittest
 {
     Packetizer.Spot p = Packetizer.getSpotPrices();
-    assert(p.gold > 0 || p.gold.isNaN, "Gold should be positive or NaN");
-    assert(p.silver > 0 || p.silver.isNaN, "Silver should be positive or NaN");
-    assert(p.platinum > 0 || p.platinum.isNaN, "Platinum should be positive or NaN");
+    assert(p.gold > 0 || p.gold is double.nan, "Gold should be positive or NaN");
+    assert(p.silver > 0 || p.silver is double.nan, "Silver should be positive or NaN");
+    assert(p.platinum > 0 || p.platinum is double.nan, "Platinum should be positive or NaN");
 }
 
 unittest

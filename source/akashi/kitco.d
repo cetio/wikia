@@ -165,10 +165,10 @@ unittest
 unittest
 {
     Kitco.Spot p = Kitco.getSpotPrices();
-    assert(p.gold > 0 || p.gold.isNaN, "Gold should be positive or NaN");
-    assert(p.silver > 0 || p.silver.isNaN, "Silver should be positive or NaN");
-    assert(p.platinum > 0 || p.platinum.isNaN, "Platinum should be positive or NaN");
-    assert(p.palladium > 0 || p.palladium.isNaN, "Palladium should be positive or NaN");
+    assert(p.gold > 0 || p.gold is double.nan, "Gold should be positive or NaN");
+    assert(p.silver > 0 || p.silver is double.nan, "Silver should be positive or NaN");
+    assert(p.platinum > 0 || p.platinum is double.nan, "Platinum should be positive or NaN");
+    assert(p.palladium > 0 || p.palladium is double.nan, "Palladium should be positive or NaN");
 }
 
 unittest

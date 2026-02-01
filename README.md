@@ -1,28 +1,44 @@
 # Akashi
 
-Akashi is a library for accessing diverse public APIs and data sources. Akashi provides clean, type-safe interfaces to scientific databases, financial markets, and knowledge repositories.
+> [!NOTE]
+> Future development for Akashi is currently ambiguous. It will likely remain a floating repository for various API integrations and data sources for the foreseeable future.
+
+Akashi is a collection of D-based interfaces for accessing diverse public APIs and specialized data sources. It provides structured access to scientific databases, financial markets, and knowledge repositories.
 
 ## Features
 
-### Scientific & Medical Data
-- **NCBI Entrez** — Access to PubMed, PMC, and PubChem databases for research articles and chemical compounds
-- **Wikipedia** — Search and retrieve articles with support for extracting structured data
-- **PsychonautWiki** — Specialized wiki for psychoactive substances and related information
+### Knowledge & Research
+- **Wikipedia** - Search, article retrieval, and structured data extraction (PubChem CIDs)
+- **PsychonautWiki** - Specialized wiki access for substance information and Erowid cross-references
+- **NCBI Entrez** - Interface for PubMed, PMC, and PubChem research databases
 
-### Financial Data
-- **Precious Metals** — Real-time spot prices from multiple sources (Kitco, Packetizer)
-- **Yahoo Finance** — Stock quotes and market data
+### Financial & Commodity Data
+- **Yahoo Finance** - Real-time stock quotes and historical market data
+- **Precious Metals** - Spot prices for gold, silver, and other metals via Kitco and Packetizer
 
-### Geospatial & Resources
-- **USGS MRDS** — Mineral Resources Data System for mining deposit information
+### Geospatial
+- **USGS MRDS** - Mineral Resources Data System for mining deposit and geological information
 
-## Design Philosophy
+## Quick Start
 
-Akashi emphasizes:
-- **Type Safety** — Structured data types for all API responses
-- **Rate Limiting** — Built-in throttling to respect API guidelines
-- **Error Handling** — Graceful degradation when services are unavailable
-- **Flexibility** — Both high-level convenience methods and low-level raw access
+**Requirements:**
+- D compiler (DMD, LDC, or GDC)
+- `dub` package manager
+
+**Install:**
+Add `akashi` to your `dub.json` or `dub.sdl`:
+```bash
+dub add akashi
+```
+
+## Architecture
+
+- `akashi.wikipedia` - Wikipedia API interaction and parser
+- `akashi.psychonaut` - PsychonautWiki and Erowid data integration
+- `akashi.yahoo` - Yahoo Finance quote retrieval
+- `akashi.entrez` - NCBI research database access
+- `akashi.kitco` / `akashi.packetizer` - Metal price scrapers and APIs
+- `akashi.mrds` - USGS mineral database access
 
 ## License
 

@@ -8,7 +8,7 @@ import std.datetime : SysTime, Clock;
 import core.thread : Thread;
 import core.time;
 import std.string : indexOf, strip;
-import std.algorithm : map;
+import std.algorithm : map, canFind;
 import std.array : array, join;
 
 static class PubChem
@@ -252,8 +252,8 @@ unittest
     // Test available properties
     string[] props = PubChem.getAvailableProperties();
     assert(props.length > 0, "Should return available properties");
-    assert(indexOf(props, "MolecularFormula") >= 0, "Should include MolecularFormula");
-    assert(indexOf(props, "MolecularWeight") >= 0, "Should include MolecularWeight");
+    assert(props.canFind("MolecularFormula") >= 0, "Should include MolecularFormula");
+    assert(props.canFind("MolecularWeight") >= 0, "Should include MolecularWeight");
 }
 
 unittest

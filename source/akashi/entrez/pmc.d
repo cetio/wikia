@@ -132,7 +132,7 @@ static class PMC
     }
 
     // Link PubMed articles to PMC and get full text
-    static PMC.Article[] fromPubMed(Article[] articles, string apiKey = null)
+    static PMC.Article[] fromPubMed(PubMed.Article[] articles, string apiKey = null)
     {
         if (articles.length == 0)
             return [];
@@ -208,7 +208,7 @@ unittest
 
 unittest
 {
-    Article[] pubmedArticles = PubMed.search("ketamine", 2);
+    PubMed.Article[] pubmedArticles = PubMed.search("ketamine", 2);
     if (pubmedArticles.length > 0)
     {
         PMC.Article[] pmcArticles = PMC.fromPubMed(pubmedArticles);
