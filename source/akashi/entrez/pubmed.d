@@ -6,7 +6,7 @@ import std.datetime : Date;
 import std.algorithm : map, filter;
 import std.array : join, array;
 import std.conv : to;
-import std.regex : regex, ctRegex, matchFirst, matchAll;
+import std.regex;
 import std.string : indexOf, strip, replace;
 
 static class PubMed
@@ -45,10 +45,10 @@ static class PubMed
         if (xml.length == 0)
             return articles;
         
-        // Simple XML parsing using regex and string operations
-        // PubMed XML structure: <PubmedArticle>...</PubmedArticle>
-        auto articleRegex = ctRegex!`<PubmedArticle>.*?</PubmedArticle>`;
-        auto matches = matchAll(xml, articleRegex);
+        RegexMatch!string matches = matchAll(
+            xml, 
+            ctRegex!`<PubmedArticle>.*?</PubmedArticle>`
+        );
         
         foreach (match; matches)
         {
@@ -56,20 +56,34 @@ static class PubMed
             PubMed.Article article;
             
             // Extract PMID
-            auto pmidMatch = matchFirst(articleXml, ctRegex!`<PMID[^>]*>(\d+)</PMID>`);
-            if (pmidMatch)
+            Captures!string pmidMatch = matchFirst(
+                articleXml, 
+                ctRegex!`<PMID[^>]*>(\d+)</PMID>`
+            );
+            if (!pmidMatch.empty)
                 article.pmid = pmidMatch.captures[1];
+            else
+                continue;
             
             // Extract title
-            auto titleMatch = matchFirst(articleXml, ctRegex!`<ArticleTitle[^>]*>(.*?)</ArticleTitle>`);
-            if (titleMatch)
+            Captures!string titleMatch = matchFirst(
+                articleXml, 
+                ctRegex!`<ArticleTitle[^>]*>(.*?)</ArticleTitle>`
+            );
+            if (!titleMatch.empty)
                 article.title = decodeXml(titleMatch.captures[1]);
             
             // Extract abstract
-            auto abstractMatch = matchFirst(articleXml, ctRegex!`<AbstractText[^>]*>(.*?)</AbstractText>`);
-            if (!abstractMatch)
-                abstractMatch = matchFirst(articleXml, ctRegex!`<AbstractText[^>]*Label="([^"]*)"[^>]*>(.*?)</AbstractText>`);
-            if (abstractMatch)
+            Captures!string abstractMatch = matchFirst(
+                articleXml, 
+                ctRegex!`<AbstractText[^>]*>(.*?)</AbstractText>`
+            );
+            if (abstractMatch.empty)
+                abstractMatch = matchFirst(
+                    articleXml, 
+                    ctRegex!`<AbstractText[^>]*Label="([^"]*)"[^>]*>(.*?)</AbstractText>`
+                );
+            if (!abstractMatch.empty)
             {
                 if (abstractMatch.captures.length > 1)
                     article.abstractText = decodeXml(abstractMatch.captures[abstractMatch.captures.length - 1]);
@@ -78,8 +92,10 @@ static class PubMed
             }
             
             // Extract authors
-            auto authorRegex = ctRegex!`<Author[^>]*>.*?<LastName[^>]*>(.*?)</LastName>.*?<ForeName[^>]*>(.*?)</ForeName>.*?</Author>`;
-            auto authorMatches = matchAll(articleXml, authorRegex);
+            RegexMatch!string authorMatches = matchAll(
+                articleXml, 
+                ctRegex!`<Author[^>]*>.*?<LastName[^>]*>(.*?)</LastName>.*?<ForeName[^>]*>(.*?)</ForeName>.*?</Author>`
+            );
             foreach (authorMatch; authorMatches)
             {
                 if (authorMatch.captures.length >= 2)
@@ -91,41 +107,48 @@ static class PubMed
             }
             
             // Extract DOI
-            auto doiMatch = matchFirst(articleXml, ctRegex!`<ELocationID[^>]*EIdType="doi"[^>]*>(.*?)</ELocationID>`);
-            if (doiMatch)
-                article.doi = decodeXml(doiMatch.captures[0]);
+            Captures!string doiMatch = matchFirst(
+                articleXml, 
+                ctRegex!`<ELocationID[^>]*EIdType="doi"[^>]*>(.*?)</ELocationID>`
+            );
+            if (!doiMatch.empty)
+                article.doi = decodeXml(doiMatch.captures[1]);
             
             // Extract publication date
-            auto dateMatch = matchFirst(articleXml, ctRegex!`<PubDate>.*?<Year[^>]*>(\d+)</Year>.*?</PubDate>`);
-            if (dateMatch && dateMatch.captures.length > 0)
+            Captures!string dateMatch = matchFirst(
+                articleXml, 
+                ctRegex!`<PubDate>.*?<Year[^>]*>(\d+)</Year>.*?</PubDate>`
+            );
+            if (!dateMatch.empty && dateMatch.captures.length > 1)
             {
-                try
-                {
-                    string yearStr = dateMatch.captures[0].strip();
-                    int year = yearStr.to!int;
-                    // Try to get month and day
-                    auto monthMatch = matchFirst(articleXml, ctRegex!`<Month[^>]*>(\d+)</Month>`);
-                    auto dayMatch = matchFirst(articleXml, ctRegex!`<Day[^>]*>(\d+)</Day>`);
-                    int month = (monthMatch && monthMatch.captures.length > 0) ? monthMatch.captures[0].strip().to!int : 1;
-                    int day = (dayMatch && dayMatch.captures.length > 0) ? dayMatch.captures[0].strip().to!int : 1;
-                    article.pubDate = Date(year, month, day);
-                }
-                catch (Exception)
-                {
-                    // Skip date parsing if conversion fails
-                }
+                string yearStr = dateMatch.captures[1].strip();
+                int year = yearStr.to!int;
+                // Try to get month and day
+                Captures!string monthMatch = matchFirst(
+                    articleXml, 
+                    ctRegex!`<Month[^>]*>(\d+)</Month>`
+                );
+                Captures!string dayMatch = matchFirst(
+                    articleXml, 
+                    ctRegex!`<Day[^>]*>(\d+)</Day>`
+                );
+                int month = (!monthMatch.empty && monthMatch.captures.length > 1) ? monthMatch.captures[1].strip().to!int : 1;
+                int day = (!dayMatch.empty && dayMatch.captures.length > 1) ? dayMatch.captures[1].strip().to!int : 1;
+                article.pubDate = Date(year, month, day);
             }
             
             // Extract journal
-            auto journalMatch = matchFirst(articleXml, ctRegex!`<Title[^>]*>(.*?)</Title>`);
-            if (journalMatch)
-                article.journal = decodeXml(journalMatch.captures[0]);
+            Captures!string journalMatch = matchFirst(
+                articleXml, 
+                ctRegex!`<Title[^>]*>(.*?)</Title>`
+            );
+            if (!journalMatch.empty)
+                article.journal = decodeXml(journalMatch.captures[1]);
             
             // Store full XML as fulltext for now (can be parsed more later)
             article.fulltext = articleXml;
             
-            if (article.pmid.length > 0)
-                articles ~= article;
+            articles ~= article;
         }
         
         return articles;
@@ -134,10 +157,10 @@ static class PubMed
     // Search PubMed and return PubMed.Article structs
     static PubMed.Article[] search(string term, int limit = 10, string apiKey = null)
     {
-        auto result = Entrez.esearch!"pubmed"(term, limit, -1, false, TimeFrame.init, apiKey);
+        JSONValue result = Entrez.esearch!"pubmed"(term, limit, 0, false, TimeFrame.init, apiKey);
         
-        if (result.isNull || !("esearchresult" in result))
-            return [];
+        if ("esearchresult" !in result)
+            throw new Exception("Entrez eSearch invalid "~result.toString);
         
         string[] pmids = result["esearchresult"]["idlist"].array.map!(x => x.str).array;
         if (pmids.length == 0)
@@ -174,9 +197,7 @@ static class PubMed
 
     // Low-level access: raw search
     static JSONValue searchRaw(string term, int limit = 10, int retstart = 0, string apiKey = null)
-    {
-        return Entrez.esearch!"pubmed"(term, limit, retstart, false, TimeFrame.init, apiKey);
-    }
+        => Entrez.esearch!"pubmed"(term, limit, retstart, false, TimeFrame.init, apiKey);
 }
 
 unittest

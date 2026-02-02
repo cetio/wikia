@@ -14,3 +14,4 @@ akashi-test-*
 *.o
 *.obj
 *.lst
+build_output*

@@ -2,8 +2,11 @@
 	"authors": [
 		"cet"
 	],
-	"copyright": "Copyright © 2025, cet",
+	"copyright": "Copyright 2025, cet",
 	"description": ".",
 	"license": "AGPL-3.0-only",
-	"name": "akashi"
+	"name": "akashi",
+	"dependencies": {
+		"gid:gtk4": "==0.9.8"
+	}
 }

@@ -22,27 +22,27 @@ static class Wikipedia
     {
         params["format"] = "json";
         params["formatversion"] = "2";
-        string queryStr;
+        string str;
         foreach (k, v; params)
         {
-            if (queryStr.length > 0)
-                queryStr ~= "&";
-            queryStr ~= k~"="~encode(v);
+            if (str.length > 0)
+                str ~= "&";
+            str ~= k~"="~encode(v);
         }
 
-        return parseJSON(get(baseURL~"?"~queryStr).idup);
+        return parseJSON(get(baseURL~"?"~str).idup);
     }
 
     static Wikipedia.Page[] search(string term, int limit = 10, int offset = 0, string ns = "0", string srprop = "snippet|titlesnippet")
     {
         string[string] params = [
-            "action" : "query",
-            "list" : "search",
-            "srsearch" : term,
-            "srlimit" : limit.to!string,
-            "sroffset" : offset.to!string,
-            "srnamespace" : ns,
-            "srprop" : srprop
+            "action": "query",
+            "list": "search",
+            "srsearch": term,
+            "srlimit": limit.to!string,
+            "sroffset": offset.to!string,
+            "srnamespace": ns,
+            "srprop": srprop
         ];
 
         Wikipedia.Page[] ret;

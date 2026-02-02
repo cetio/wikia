@@ -13,11 +13,6 @@ struct TimeFrame
 {
     string from;
     string to;
-    
-    static TimeFrame init()
-    {
-        return TimeFrame();
-    }
 }
 
 static class Entrez
@@ -97,13 +92,16 @@ static class Entrez
 
         rateLimit();
 
-        string url = entrez~"efetch.fcgi?db="~DB~"&retmode="~RETMODE~"&rettype="~rettype;
+        string url = entrez~"efetch.fcgi?db="~encode(DB)~"&retmode="~encode(RETMODE)~"&rettype="~encode(rettype);
 
         // Use POST for more than 200 IDs or if URL would be too long
         string idParam = ids.join(",");
         if (ids.length > 200 || idParam.length > 2000)
         {
-            string postData = "db="~DB~"&retmode="~RETMODE~"&rettype="~rettype~"&id="~idParam;
+            string postData = "db="~encode(DB)
+                ~"&retmode="~encode(RETMODE)
+                ~"&rettype="~encode(rettype)
+                ~"&id="~encode(idParam);
             if (apiKey !is null && apiKey.length > 0)
                 postData ~= "&api_key="~encode(apiKey);
 
@@ -114,7 +112,7 @@ static class Entrez
         }
         else
         {
-            url ~= "&id="~idParam;
+            url ~= "&id="~encode(idParam);
             if (apiKey !is null && apiKey.length > 0)
                 url ~= "&api_key="~encode(apiKey);
 

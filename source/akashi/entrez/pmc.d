@@ -5,7 +5,7 @@ import akashi.entrez.pubmed;
 import std.json : JSONValue;
 import std.algorithm : map, filter;
 import std.array : join, array;
-import std.regex : ctRegex, matchFirst, matchAll;
+import std.regex;
 import std.string : indexOf, strip, replace;
 
 static class PMC
@@ -42,9 +42,10 @@ static class PMC
         if (xml.length == 0)
             return articles;
         
-        // PMC XML structure: <article>...</article> or <pmc-articleset>...</pmc-articleset>
-        auto articleRegex = ctRegex!`<(?:article|pmc-articleset)>.*?</(?:article|pmc-articleset)>`;
-        auto matches = matchAll(xml, articleRegex);
+        RegexMatch!string matches = matchAll(
+            xml, 
+            ctRegex!`<(?:article|pmc-articleset)>.*?</(?:article|pmc-articleset)>`
+        );
         
         foreach (match; matches)
         {
@@ -52,77 +53,84 @@ static class PMC
             PMC.Article article;
             
             // Extract PMC ID
-            auto pmcMatch = matchFirst(articleXml, ctRegex!`<article-id[^>]*pub-id-type="pmc"[^>]*>(\d+)</article-id>`);
-            if (!pmcMatch)
-                pmcMatch = matchFirst(articleXml, ctRegex!`pmc-(\d+)`);
-            if (pmcMatch)
+            Captures!string pmcMatch = matchFirst(
+                articleXml, 
+                ctRegex!`<article-id[^>]*pub-id-type="pmc"[^>]*>(\d+)</article-id>`
+            );
+            pmcMatch = pmcMatch.empty ? matchFirst(articleXml, ctRegex!`pmc-(\d+)`) : pmcMatch;
+            if (pmcMatch.empty)
+                continue;
+            else
                 article.pmcId = pmcMatch.captures[0];
             
             // Extract PMID
-            auto pmidMatch = matchFirst(articleXml, ctRegex!`<article-id[^>]*pub-id-type="pmid"[^>]*>(\d+)</article-id>`);
-            if (pmidMatch)
+            Captures!string pmidMatch = matchFirst(
+                articleXml,
+                ctRegex!`<article-id[^>]*pub-id-type="pmid"[^>]*>(\d+)</article-id>`
+            );
+            if (!pmidMatch.empty)
                 article.pmid = pmidMatch.captures[0];
             
             // Extract title
-            auto titleMatch = matchFirst(articleXml, ctRegex!`<article-title[^>]*>(.*?)</article-title>`);
-            if (titleMatch)
+            Captures!string titleMatch = matchFirst(
+                articleXml, 
+                ctRegex!`<article-title[^>]*>(.*?)</article-title>`
+            );
+            if (!titleMatch.empty)
                 article.title = decodeXml(titleMatch.captures[0]);
             
             // Extract authors
-            auto authorRegex = ctRegex!`<contrib[^>]*contrib-type="author"[^>]*>.*?<surname[^>]*>(.*?)</surname>.*?<given-names[^>]*>(.*?)</given-names>.*?</contrib>`;
-            auto authorMatches = matchAll(articleXml, authorRegex);
-            foreach (authorMatch; authorMatches)
+            RegexMatch!string authorMatch = matchAll(
+                articleXml, 
+                ctRegex!`<contrib[^>]*contrib-type="author"[^>]*>.*?<surname[^>]*>(.*?)</surname>.*?<given-names[^>]*>(.*?)</given-names>.*?</contrib>`
+            );
+            foreach (author; authorMatch)
             {
-                if (authorMatch.captures.length >= 2)
+                if (author.captures.length >= 2)
                 {
-                    string lastName = decodeXml(authorMatch.captures[0]);
-                    string foreName = decodeXml(authorMatch.captures[1]);
+                    string lastName = decodeXml(author.captures[0]);
+                    string foreName = decodeXml(author.captures[1]);
                     article.authors ~= foreName~" "~lastName;
                 }
             }
             
             // Extract DOI
-            auto doiMatch = matchFirst(articleXml, ctRegex!`<article-id[^>]*pub-id-type="doi"[^>]*>(.*?)</article-id>`);
-            if (doiMatch)
+            Captures!string doiMatch = matchFirst(
+                articleXml, 
+                ctRegex!`<article-id[^>]*pub-id-type="doi"[^>]*>(.*?)</article-id>`
+            );
+            if (!doiMatch.empty)
                 article.doi = decodeXml(doiMatch.captures[0]);
+
+            // Extract abstract
+            Captures!string abstractMatch = matchFirst(
+                articleXml, 
+                ctRegex!`<abstract[^>]*>(.*?)</abstract>`
+            );
+            if (!abstractMatch.empty)
+                article.fulltext = decodeXml(abstractMatch.captures[0]);
             
             // Extract full text (body sections)
-            auto bodyMatch = matchFirst(articleXml, ctRegex!`<body[^>]*>(.*?)</body>`);
-            if (bodyMatch)
-            {
-                article.fulltext = decodeXml(bodyMatch.captures[0]);
-                // Also try to extract abstract
-                auto abstractMatch = matchFirst(articleXml, ctRegex!`<abstract[^>]*>(.*?)</abstract>`);
-                if (abstractMatch)
-                {
-                    string abstractText = decodeXml(abstractMatch.captures[0]);
-                    article.fulltext = abstractText~"\n\n"~article.fulltext;
-                }
-            }
-            else
-            {
-                // If no body, try to get abstract at least
-                auto abstractMatch = matchFirst(articleXml, ctRegex!`<abstract[^>]*>(.*?)</abstract>`);
-                if (abstractMatch)
-                    article.fulltext = decodeXml(abstractMatch.captures[0]);
-            }
+            RegexMatch!string bodyMatch = matchAll(
+                articleXml, 
+                ctRegex!`<body[^>]*>(.*?)</body>`
+            );
+            if (!bodyMatch.captures.empty)
+                article.fulltext ~= "\n\n"~decodeXml(bodyMatch.front.captures[0]);
             
-            if (article.pmcId.length > 0)
-                articles ~= article;
+            articles ~= article;
         }
         
         return articles;
     }
 
-    // Search PMC directly
     static PMC.Article[] search(string term, int limit = 10, string apiKey = null)
     {
-        auto result = Entrez.esearch!"pmc"(term, limit, -1, false, TimeFrame.init, apiKey);
+        JSONValue json = Entrez.esearch!"pmc"(term, limit, 0, false, TimeFrame.init, apiKey);
+        if ("esearchresult" !in json)
+            throw new Exception("Entrez eSearch invalid "~json.toString);
         
-        if (result.isNull || !("esearchresult" in result))
-            return [];
-        
-        string[] pmcIds = result["esearchresult"]["idlist"].array.map!(x => x.str).array;
+        string[] pmcIds = json["esearchresult"]["idlist"].array.map!(x => x.str).array;
         if (pmcIds.length == 0)
             return [];
         
@@ -131,19 +139,17 @@ static class PMC
         return parsePMCArticles(xml);
     }
 
-    // Link PubMed articles to PMC and get full text
     static PMC.Article[] fromPubMed(PubMed.Article[] articles, string apiKey = null)
     {
         if (articles.length == 0)
             return [];
         
-        string[] pmids = articles.map!(a => a.pmid).array;
+        string[] pmids = articles.map!(x => x.pmid).array;
         PMC.Article[] pmcArticles;
         
-        // Link each PMID to PMC
         foreach (pmid; pmids)
         {
-            auto linkResult = Entrez.elink!("pubmed", "pmc")(pmid, TimeFrame.init, apiKey);
+            JSONValue linkResult = Entrez.elink!("pubmed", "pmc")(pmid, TimeFrame.init, apiKey);
             
             if (!linkResult.isNull && "linksets" in linkResult)
             {
@@ -157,9 +163,7 @@ static class PMC
                             {
                                 foreach (link; linksetdb["links"].array)
                                 {
-                                    string pmcId = link["id"].str;
-                                    // Fetch full text for this PMC ID
-                                    string xml = Entrez.efetch!("pmc", "xml")(pmcId, "full", apiKey);
+                                    string xml = Entrez.efetch!("pmc", "xml")(link["id"].str, "full", apiKey);
                                     PMC.Article[] parsed = parsePMCArticles(xml);
                                     pmcArticles ~= parsed;
                                 }
@@ -176,20 +180,17 @@ static class PMC
     // Get full text for PMC articles
     static string[] fulltext(PMC.Article[] articles, string apiKey = null)
     {
-        string[] pmcIds = articles.map!(a => a.pmcId).array;
+        string[] pmcIds = articles.map!(x => x.pmcId).array;
         if (pmcIds.length == 0)
             return [];
         
         string xml = Entrez.efetch!("pmc", "xml")(pmcIds, "full", apiKey);
-        PMC.Article[] fullArticles = parsePMCArticles(xml);
-        return fullArticles.map!(a => a.fulltext).array;
+        return parsePMCArticles(xml).map!(x => x.fulltext).array;
     }
 
     // Low-level access: raw search
     static JSONValue searchRaw(string term, int limit = 10, int retstart = 0, string apiKey = null)
-    {
-        return Entrez.esearch!"pmc"(term, limit, retstart, false, TimeFrame.init, apiKey);
-    }
+        => Entrez.esearch!"pmc"(term, limit, retstart, false, TimeFrame.init, apiKey);
 }
 
 unittest

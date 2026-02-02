@@ -3,6 +3,7 @@ module akashi.packetizer;
 import std.net.curl : get;
 import std.json : JSONValue, parseJSON, JSONType;
 import std.conv : to;
+import std.math : isNaN;
 import std.datetime : SysTime, Clock;
 import core.thread : Thread;
 import core.time;
@@ -24,8 +25,8 @@ static class Packetizer
 
     private static void rateLimit()
     {
-        auto now = Clock.currTime();
-        auto elapsed = now - lastRequestTime;
+        SysTime now = Clock.currTime();
+        Duration elapsed = now - lastRequestTime;
         if (elapsed < minRequestInterval)
             Thread.sleep(minRequestInterval - elapsed);
         lastRequestTime = Clock.currTime();
@@ -46,24 +47,18 @@ static class Packetizer
     {
         rateLimit();
         Packetizer.Spot result;
-        try
-        {
-            string raw = get(baseURL).idup;
-            JSONValue json = parseJSON(raw);
-            if (json.isNull)
-                return result;
-            if ("gold" in json)
-                result.gold = extractPrice(json["gold"]);
-            if ("silver" in json)
-                result.silver = extractPrice(json["silver"]);
-            if ("platinum" in json)
-                result.platinum = extractPrice(json["platinum"]);
-            if ("date" in json)
-                result.date = json["date"].str;
-        }
-        catch (Exception)
-        {
-        }
+        string raw = get(baseURL).idup;
+        JSONValue json = parseJSON(raw);
+        if (json.isNull)
+            return result;
+        if ("gold" in json)
+            result.gold = extractPrice(json["gold"]);
+        if ("silver" in json)
+            result.silver = extractPrice(json["silver"]);
+        if ("platinum" in json)
+            result.platinum = extractPrice(json["platinum"]);
+        if ("date" in json)
+            result.date = json["date"].str;
         return result;
     }
 
@@ -104,9 +99,9 @@ unittest
 unittest
 {
     Packetizer.Spot p = Packetizer.getSpotPrices();
-    assert(p.gold > 0 || p.gold is double.nan, "Gold should be positive or NaN");
-    assert(p.silver > 0 || p.silver is double.nan, "Silver should be positive or NaN");
-    assert(p.platinum > 0 || p.platinum is double.nan, "Platinum should be positive or NaN");
+    assert(p.gold > 0 || p.gold.isNaN, "Gold should be positive or NaN");
+    assert(p.silver > 0 || p.silver.isNaN, "Silver should be positive or NaN");
+    assert(p.platinum > 0 || p.platinum.isNaN, "Platinum should be positive or NaN");
 }
 
 unittest

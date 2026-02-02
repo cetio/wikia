@@ -7,6 +7,7 @@ import std.conv : to;
 import std.string : strip, split, toUpper, toLower;
 import std.array : array;
 import std.algorithm : filter, map;
+import std.math : isNaN;
 import std.datetime : SysTime, Clock;
 import core.thread : Thread;
 import core.time;
@@ -34,8 +35,8 @@ static class MRDS
 
     private static void rateLimit()
     {
-        auto now = Clock.currTime();
-        auto elapsed = now - lastRequestTime;
+        SysTime now = Clock.currTime();
+        Duration elapsed = now - lastRequestTime;
         if (elapsed < minRequestInterval)
             Thread.sleep(minRequestInterval - elapsed);
         lastRequestTime = Clock.currTime();
@@ -57,91 +58,85 @@ static class MRDS
         if (c == "zinc")
             return "ZN";
         if (commodity.length >= 2)
-            return toUpper(commodity[0 .. 2]);
+            return toUpper(commodity[0..2]);
         return toUpper(commodity);
     }
 
-    static MRDS.Deposit[] queryDeposits(string where = "1=1", string outFields = "*", int resultRecordCount = 100)
+    static MRDS.Deposit[] queryDeposits(string where = "1=1", string outFields = "*", int count = 100)
     {
         rateLimit();
         MRDS.Deposit[] result;
-        try
+        string url = baseURL~"/query?where="~encode(where)
+           ~"&outFields="~encode(outFields)
+           ~"&resultRecordCount="~count.to!string
+           ~"&f=json";
+        string raw = get(url).idup;
+        JSONValue json = parseJSON(raw);
+        if (json.isNull || !("features" in json))
+            return result;
+        foreach (feat; json["features"].array)
         {
-            string url = baseURL~"/query?where="~encode(where)
-               ~"&outFields="~encode(outFields)
-               ~"&resultRecordCount="~resultRecordCount.to!string
-               ~"&f=json";
-            string raw = get(url).idup;
-            JSONValue json = parseJSON(raw);
-            if (json.isNull || !("features" in json))
-                return result;
-            foreach (feat; json["features"].array)
+            MRDS.Deposit d;
+            if ("attributes" in feat)
             {
-                MRDS.Deposit d;
-                if ("attributes" in feat)
+                JSONValue attr = feat["attributes"];
+                d.attributes = attr;
+                if ("OBJECTID" in attr)
                 {
-                    JSONValue attr = feat["attributes"];
-                    d.attributes = attr;
-                    if ("OBJECTID" in attr)
-                    {
-                        auto v = attr["OBJECTID"];
-                        if (v.type == JSONType.integer)
-                            d.objectId = v.integer;
-                    }
-                    if ("DEP_ID" in attr)
-                        d.depId = attr["DEP_ID"].str;
-                    if ("SITE_NAME" in attr)
-                        d.siteName = attr["SITE_NAME"].str;
-                    if ("DEV_STAT" in attr)
-                        d.devStat = attr["DEV_STAT"].str;
-                    if ("CODE_LIST" in attr)
-                        d.codeList = attr["CODE_LIST"].str;
-                    if ("Grade" in attr)
-                        d.grade = attr["Grade"].str;
+                    JSONValue v = attr["OBJECTID"];
+                    if (v.type == JSONType.integer)
+                        d.objectId = v.integer;
                 }
-                if ("geometry" in feat && feat["geometry"].type == JSONType.object)
-                {
-                    if ("x" in feat["geometry"])
-                    {
-                        auto v = feat["geometry"]["x"];
-                        if (v.type == JSONType.float_)
-                            d.x = v.floating;
-                        else if (v.type == JSONType.integer)
-                            d.x = v.integer.to!double;
-                    }
-                    if ("y" in feat["geometry"])
-                    {
-                        auto v = feat["geometry"]["y"];
-                        if (v.type == JSONType.float_)
-                            d.y = v.floating;
-                        else if (v.type == JSONType.integer)
-                            d.y = v.integer.to!double;
-                    }
-                }
-                result ~= d;
+                if ("DEP_ID" in attr)
+                    d.depId = attr["DEP_ID"].str;
+                if ("SITE_NAME" in attr)
+                    d.siteName = attr["SITE_NAME"].str;
+                if ("DEV_STAT" in attr)
+                    d.devStat = attr["DEV_STAT"].str;
+                if ("CODE_LIST" in attr)
+                    d.codeList = attr["CODE_LIST"].str;
+                if ("Grade" in attr)
+                    d.grade = attr["Grade"].str;
             }
-        }
-        catch (Exception)
-        {
+            if ("geometry" in feat && feat["geometry"].type == JSONType.object)
+            {
+                if ("x" in feat["geometry"])
+                {
+                    JSONValue v = feat["geometry"]["x"];
+                    if (v.type == JSONType.float_)
+                        d.x = v.floating;
+                    else if (v.type == JSONType.integer)
+                        d.x = v.integer.to!double;
+                }
+                if ("y" in feat["geometry"])
+                {
+                    JSONValue v = feat["geometry"]["y"];
+                    if (v.type == JSONType.float_)
+                        d.y = v.floating;
+                    else if (v.type == JSONType.integer)
+                        d.y = v.integer.to!double;
+                }
+            }
+            result ~= d;
         }
         return result;
     }
 
-    static MRDS.Deposit[] queryByCommodity(string commodity, int resultRecordCount = 100)
+    static MRDS.Deposit[] queryByCommodity(string commodity, int count = 100)
     {
         string code = commodityToCode(commodity);
         string where = "CODE_LIST LIKE '%"~code~"%'";
-        return queryDeposits(where, "OBJECTID,DEP_ID,SITE_NAME,DEV_STAT,CODE_LIST,Grade", resultRecordCount);
+        return queryDeposits(where, "OBJECTID,DEP_ID,SITE_NAME,DEV_STAT,CODE_LIST,Grade", count);
     }
 
-    static JSONValue queryRaw(string where = "1=1", string outFields = "*", int resultRecordCount = 100)
+    static JSONValue queryRaw(string where = "1=1", string outFields = "*", int count = 100)
     {
         rateLimit();
         try
         {
             string url = baseURL~"/query?where="~encode(where)
                ~"&outFields="~encode(outFields)
-               ~"&resultRecordCount="~resultRecordCount.to!string
+               ~"&resultRecordCount="~count.to!string
                ~"&f=json";
             string raw = get(url).idup;
             return parseJSON(raw);
@@ -231,7 +226,7 @@ unittest
     bool hasCoordinates = false;
     foreach (d; deps)
     {
-        if (!(d.x is double.nan) && !(d.y is double.nan))
+        if (!d.x.isNaN && !d.y.isNaN)
         {
             hasCoordinates = true;
             break;
