@@ -40,7 +40,12 @@ static class Psychonaut
         return parseJSON(get(baseURL~"?"~str).idup);
     }
 
-    static Psychonaut.Page[] search(string term, int limit = 10, int offset = 0, string ns = "0", string srprop = "snippet|titlesnippet")
+    static Psychonaut.Page[] search(
+        string term, 
+        int limit = 10, 
+        int offset = 0, 
+        string ns = "0", 
+        string srprop = "snippet|titlesnippet")
     {
         string[string] params = [
             "action": "query",

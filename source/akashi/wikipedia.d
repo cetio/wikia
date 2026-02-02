@@ -33,7 +33,12 @@ static class Wikipedia
         return parseJSON(get(baseURL~"?"~str).idup);
     }
 
-    static Wikipedia.Page[] search(string term, int limit = 10, int offset = 0, string ns = "0", string srprop = "snippet|titlesnippet")
+    static Wikipedia.Page[] search(
+        string term, 
+        int limit = 10, 
+        int offset = 0, 
+        string ns = "0", 
+        string srprop = "snippet|titlesnippet")
     {
         string[string] params = [
             "action": "query",

@@ -155,7 +155,10 @@ static class PubMed
     }
 
     // Search PubMed and return PubMed.Article structs
-    static PubMed.Article[] search(string term, int limit = 10, string apiKey = null)
+    static PubMed.Article[] search(
+        string term, 
+        int limit = 10, 
+        string apiKey = null)
     {
         JSONValue result = Entrez.esearch!"pubmed"(term, limit, 0, false, TimeFrame.init, apiKey);
         
