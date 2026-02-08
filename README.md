@@ -1,9 +1,9 @@
-# Akashi
+# Wikia
 
 > [!NOTE]
-> Future development for Akashi is currently ambiguous. It will likely remain a floating repository for various API integrations and data sources for the foreseeable future.
+> Future development for Wikia is currently ambiguous. It will likely remain a floating repository for various API integrations and data sources for the foreseeable future.
 
-Akashi is a collection of D-based interfaces for accessing diverse public APIs and specialized data sources. It provides structured access to scientific databases, financial markets, and knowledge repositories.
+Wikia is a collection of D-based interfaces for accessing diverse public APIs and specialized data sources. It provides structured access to scientific databases, financial markets, and knowledge repositories.
 
 ## Features
 
@@ -26,20 +26,20 @@ Akashi is a collection of D-based interfaces for accessing diverse public APIs a
 - `dub` package manager
 
 **Install:**
-Add `akashi` to your `dub.json` or `dub.sdl`:
+Add `wikia` to your `dub.json` or `dub.sdl`:
 ```bash
-dub add akashi
+dub add wikia
 ```
 
 ## Architecture
 
-- `akashi.wikipedia` - Wikipedia API interaction and parser
-- `akashi.psychonaut` - PsychonautWiki and Erowid data integration
-- `akashi.yahoo` - Yahoo Finance quote retrieval
-- `akashi.entrez` - NCBI research database access
-- `akashi.kitco` / `akashi.packetizer` - Metal price scrapers and APIs
-- `akashi.mrds` - USGS mineral database access
+- `wikia.wikipedia` - Wikipedia API interaction and parser
+- `wikia.psychonaut` - PsychonautWiki and Erowid data integration
+- `wikia.yahoo` - Yahoo Finance quote retrieval
+- `wikia.entrez` - NCBI research database access
+- `wikia.kitco` / `wikia.packetizer` - Metal price scrapers and APIs
+- `wikia.mrds` - USGS mineral database access
 
 ## License
 
-Akashi is licensed under the [AGPL-3.0 license](LICENSE.txt).
+Wikia is licensed under the [AGPL-3.0 license](LICENSE.txt).

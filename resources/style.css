@@ -1,0 +1,252 @@
+.root-container {
+    padding: 0;
+    background: #ffffff;
+    color: #202122;
+}
+
+/* Homepage Styles */
+.homepage-container {
+    background: transparent;
+}
+
+.homepage-wave-bg {
+    background: #ffffff;
+}
+
+.homepage-content {
+    padding: 0 24px;
+    background: transparent;
+}
+
+.homepage-logo {
+    color: #202122;
+    font-size: 3.5em;
+    font-weight: 400;
+    letter-spacing: -1px;
+    margin-bottom: 8px;
+}
+
+.homepage-logo-accent {
+    color: #3366cc;
+}
+
+.homepage-tagline {
+    color: #72777d;
+    font-size: 1.1em;
+    margin-bottom: 32px;
+}
+
+.homepage-search-box {
+    background: rgba(255, 255, 255, 0.9);
+    border: none;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    padding: 4px;
+}
+
+.homepage-search-box:focus-within {
+    border-color: #3366cc;
+    box-shadow: 0 1px 3px rgba(51, 102, 204, 0.15);
+}
+
+.homepage-search-entry {
+    min-height: 36px;
+    padding: 8px 12px;
+    font-size: 1.05em;
+    border: none;
+    background: transparent;
+    color: #202122;
+}
+
+.homepage-search-entry:focus {
+    outline: none;
+}
+
+.homepage-search-button {
+    background: #3366cc;
+    color: #ffffff;
+    border-radius: 4px;
+    padding: 8px 20px;
+    font-size: 0.95em;
+    font-weight: 500;
+    min-height: 36px;
+}
+
+.homepage-search-button:hover {
+    background: #2a56a8;
+}
+
+.homepage-links {
+    margin-top: 24px;
+    font-size: 0.9em;
+    color: #72777d;
+}
+
+.homepage-link {
+    color: #3366cc;
+    text-decoration: none;
+}
+
+.homepage-link:hover {
+    text-decoration: underline;
+}
+
+/* Search Results Styles */
+.search-results-container {
+    background: #ffffff;
+    padding: 24px;
+}
+
+.search-results-header {
+    font-size: 1.3em;
+    font-weight: bold;
+    color: #202122;
+    margin-bottom: 16px;
+}
+
+.search-result-row {
+    padding: 16px;
+    border-bottom: 1px solid #eaecf0;
+    background: #ffffff;
+}
+
+.search-result-row:hover {
+    background: #f8f9fa;
+}
+
+.search-result-title {
+    font-size: 1.1em;
+    font-weight: 500;
+    color: #3366cc;
+}
+
+.search-result-detail {
+    font-size: 0.9em;
+    color: #72777d;
+    margin-top: 4px;
+}
+
+/* Error display styles */
+.error-header {
+    color: #d32f2f;
+}
+
+.error-text {
+    color: #d32f2f;
+    font-weight: 500;
+}
+
+/* Home Button */
+.home-button {
+    background: #f8f9fa;
+    border: 1px solid #a2a9b1;
+    border-radius: 4px;
+    padding: 12px;
+    color: #202122;
+}
+
+.home-button:hover {
+    background: #eaecf0;
+}
+
+/* Fullscreen Close Button */
+.fullscreen-close {
+    background: #ffffff;
+    border: none;
+    border-radius: 4px;
+    color: #202122;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.fullscreen-close:hover {
+    background: #f0f0f0;
+}
+
+.search-entry {
+    min-width: 260px;
+}
+
+.suggestion-row {
+    padding: 10px 12px;
+}
+
+.suggestion-secondary {
+    color: rgba(46, 52, 54, 0.60);
+    font-size: 0.95em;
+}
+
+.article-scroll {
+    background: #ffffff;
+}
+
+.article-body {
+    background: #ffffff;
+    padding: 20px 24px;
+}
+
+.article-placeholder {
+    color: #72777d;
+    font-style: italic;
+    font-size: 1.05em;
+    padding-top: 8px;
+}
+
+.infobox {
+    background: #f8f9fa;
+    border: 1px solid #a2a9b1;
+    padding: 0;
+    margin-bottom: 12px;
+    margin-left: 16px;
+}
+
+.infobox-title {
+    background: #eaecf0;
+    padding: 8px 10px;
+    font-weight: bold;
+    font-size: 1.05em;
+    border-bottom: 1px solid #a2a9b1;
+}
+
+.infobox-viewer-frame {
+    background: #1a1a2e;
+    border-bottom: 1px solid #a2a9b1;
+}
+
+.infobox-section-header {
+    background: #eaecf0;
+    padding: 4px 10px;
+    font-weight: bold;
+    font-size: 0.9em;
+    border-top: 1px solid #a2a9b1;
+    border-bottom: 1px solid #a2a9b1;
+}
+
+.infobox-row {
+    padding: 4px 10px;
+    border-bottom: 1px solid #eaecf0;
+    font-size: 0.9em;
+}
+
+.infobox-label {
+    font-weight: 600;
+    color: #202122;
+    min-width: 100px;
+}
+
+.infobox-value {
+    color: #202122;
+}
+
+.molecule-viewer {
+    background: #1a1a2e;
+}
+
+.fullscreen-bg {
+    background: rgba(0, 0, 0, 0.92);
+}
+
+.fullscreen-name {
+    color: rgba(255, 255, 255, 0.15);
+    font-size: 4em;
+    font-weight: bold;
+}
