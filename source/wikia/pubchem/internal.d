@@ -36,8 +36,7 @@ Compound[] internalGetProperties(string TYPE)(string str)
 
             foreach (props; json["PropertyTable"]["Properties"].array)
             {
-                Compound compound = new Compound();
-                compound.cid = props["CID"].get!int;
+                Compound compound = Compound.getOrCreate(props["CID"].get!int);
                 compound.properties = Properties(
                     "Title" in props ? props["Title"].str : null,
                     "SMILES" in props ? props["SMILES"].str : null,
@@ -48,7 +47,7 @@ Compound[] internalGetProperties(string TYPE)(string str)
                     "MolecularWeight" in props ? props["MolecularWeight"].str.to!double : double.nan,
                     "ExactMass" in props ? props["ExactMass"].str.to!double : double.nan,
                     "Charge" in props ? props["Charge"].get!int : 0,
-                    "TPSA" in props ? props["TPSA"].floating : double.nan
+                    "TPSA" in props ? props["TPSA"].get!double : double.nan
                 );
                 ret ~= compound;
             }
@@ -72,8 +71,7 @@ Compound[] internalGetID(string TYPE)(string str)
 
             foreach (idList; json["InformationList"]["Information"].array)
             {
-                Compound compound = new Compound();
-                compound.cid = idList["CID"].get!int;
+                Compound compound = Compound.getOrCreate(idList["CID"].get!int);
                 foreach (sid; idList["SID"].array)
                     compound.sids ~= sid.get!int;
                 ret ~= compound;
@@ -103,6 +101,57 @@ Conformer3D[] internalGetConformer3D(string TYPE)(string str)
                 conformer.parseBonds(pc);
                 conformer.parseCoords(pc);
                 ret ~= conformer;
+            }
+        }, 
+        null
+    );
+    return ret;
+}
+
+string[][] internalGetSynonyms(string TYPE)(string str)
+{
+    string[][] ret;
+    orchestrator.rateLimit();
+    orchestrator.client.get(
+        orchestrator.buildURL("/compound/"~TYPE~"/"~str~"/synonyms/JSON"), 
+        (ubyte[] data) {
+            JSONValue json = parseJSON(data.assumeUTF);
+            if (json.isNull || "InformationList" !in json || "Information" !in json["InformationList"])
+                return;
+
+            foreach (info; json["InformationList"]["Information"].array)
+            {
+                string[] synonyms;
+                if ("Synonym" in info)
+                {
+                    foreach (JSONValue syn; info["Synonym"].array)
+                        synonyms ~= syn.str;
+                }
+                ret ~= synonyms;
+            }
+        }, 
+        null
+    );
+    return ret;
+}
+
+Compound[] internalSimilaritySearch(string TYPE)(string str, int threshold = 90, int maxRecords = 2_000_000)
+{
+    Compound[] ret;
+    orchestrator.rateLimit();
+    orchestrator.client.get(
+        orchestrator.buildURL(
+            "/compound/fastsimilarity_2d/"~TYPE~"/"~str~"/cids/JSON", 
+            ["Threshold": threshold.to!string, "MaxRecords": maxRecords.to!string]
+        ), 
+        (ubyte[] data) {
+            JSONValue json = parseJSON(data.assumeUTF);
+            if (json.isNull || "IdentifierList" !in json || "CID" !in json["IdentifierList"])
+                throw new Exception("Similarity search results are invalid "~json.toString());
+
+            foreach (cid; json["IdentifierList"]["CID"].array)
+            {
+                ret ~= Compound.getOrCreate(cid.get!int);
             }
         }, 
         null
@@ -252,3 +301,24 @@ void parseCoords(Conformer3D conformer, JSONValue json)
         }
     }
 }
+
+/*
+Similarity
+
+This is a special type of compound namespace input that retrieves CIDs by 2D similarity search. It requires a CID, or a SMILES, InChI, or SDF string in the URL path or POST body (InChI and SDF by POST only). Valid output formats are XML, JSON(P), and ASNT/B.
+
+Example:
+
+https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/fastsimilarity_2d/cid/2244/cids/XML
+
+Similarity search options are specified via URL arguments:
+Option	Type	Meaning	Default
+Threshold	integer	minimum Tanimoto score for a hit	90
+MaxSeconds	integer	maximum search time in seconds	unlimited
+MaxRecords	integer	maximum number of hits	2M
+listkey	string	restrict to matches within hits from a prior search	none
+
+Example:
+
+https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/fastsimilarity_2d/smiles/C1=NC2=C(N1)C(=O)N=C(N2)N/cids/XML?Threshold=95&MaxRecords=100
+*/

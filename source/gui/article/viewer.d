@@ -42,7 +42,7 @@ class MoleculeViewer : DrawingArea
 
     public:
 
-    this()
+    this(bool enableDrag = true)
     {
         addCssClass("molecule-viewer");
         setContentWidth(400);
@@ -52,10 +52,13 @@ class MoleculeViewer : DrawingArea
 
         setDrawFunc(&onDraw);
 
-        auto dragGesture = new gtk.gesture_drag.GestureDrag();
-        dragGesture.connectDragBegin(&onDragBegin);
-        dragGesture.connectDragUpdate(&onDragUpdate);
-        addController(dragGesture);
+        if (enableDrag)
+        {
+            auto dragGesture = new gtk.gesture_drag.GestureDrag();
+            dragGesture.connectDragBegin(&onDragBegin);
+            dragGesture.connectDragUpdate(&onDragUpdate);
+            addController(dragGesture);
+        }
 
         auto scrollController = new gtk.event_controller_scroll.EventControllerScroll(
             EventControllerScrollFlags.Vertical
@@ -133,6 +136,7 @@ class MoleculeViewer : DrawingArea
         if (!ret.hit)
         {
             hover.clear();
+            queueDraw();
             return;
         }
 
@@ -163,6 +167,7 @@ class MoleculeViewer : DrawingArea
     private void onLeave()
     {
         hover.clear();
+        queueDraw();
     }
 
 

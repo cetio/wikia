@@ -2,16 +2,6 @@ module wikia.pubchem.compound;
 
 import wikia.pubchem;
 
-// struct Dosage
-// {
-//     string route;
-//     string threshold;
-//     string light;
-//     string common;
-//     string strong;
-//     string heavy;
-// }
-
 struct Properties
 {
     string title;
@@ -28,20 +18,64 @@ struct Properties
 
 class Compound
 {
+    static Compound[int] registry;
+
+    static Compound getOrCreate(int cid)
+    {
+        assert(cid != 0, "CID must not be zero");
+        if (auto p = cid in registry)
+            return *p;
+
+        auto c = new Compound(cid);
+        registry[cid] = c;
+        return c;
+    }
+
     int cid;
     int[] sids;
     Properties properties;
 
-    string name() => properties.title;
-    string smiles() => properties.smiles;
-    string iupac() => properties.iupac;
-    string inchi() => properties.inchi;
+package:
+    this(int cid)
+    {
+        assert(cid != 0, "CID must not be zero");
+        this.cid = cid;
+    }
 
     Conformer3D _conformer3D;
+    string[] _synonyms;
 
-    package this()
+public:
+    ref string name()
     {
+        if (properties.title == null)
+            properties = getProperties!"cid"(cid)[0].properties;
 
+        return properties.title;
+    }
+
+    ref string smiles()
+    {
+        if (properties.smiles == null)
+            properties = getProperties!"cid"(cid)[0].properties;
+
+        return properties.smiles;
+    }
+
+    ref string iupac()
+    {
+        if (properties.iupac == null)
+            properties = getProperties!"cid"(cid)[0].properties;
+
+        return properties.iupac;
+    }
+
+    ref string inchi()
+    {
+        if (properties.inchi == null)
+            properties = getProperties!"cid"(cid)[0].properties;
+
+        return properties.inchi;
     }
 
     static Compound byName(string name)
@@ -54,38 +88,19 @@ class Compound
         return getProperties!TYPE(id)[0];
     }
 
+    string[] synonyms()
+    {
+        if (_synonyms.length == 0)
+            _synonyms = getSynonyms!"cid"(cid)[0];
+
+        return _synonyms;
+    }
+
     Conformer3D conformer3D()
     {
         if (_conformer3D is null)
-            _conformer3D = getConformer3D(name);
+            _conformer3D = getConformer3D!"cid"(cid)[0];
 
         return _conformer3D;
     }
-
-    // ref Dosage[] dosage()
-    // {
-    //     if (_dosage == null)
-    //     {
-    //         if (pages.filter!((x) => x.source == "psychonaut").empty)
-    //             pages ~= new Page(title, "psychonaut");
-
-    //         if ("dosage" in pages.filter!((x) => x.source == "psychonaut")[0].metadata.fields)
-    //         {
-    //             JSONValue dosage = parseJSON(pages.filter!((x) => x.source == "psychonaut")[0].metadata.fields["dosage"]);
-    //             foreach (JSONValue json; dosage.array)
-    //             {
-    //                 _dosage ~= Dosage(
-    //                     json["route"].str,
-    //                     "threshold" in json ? json["threshold"].str : null,
-    //                     "light" in json ? json["light"].str : null,
-    //                     "common" in json ? json["common"].str : null,
-    //                     "strong" in json ? json["strong"].str : null,
-    //                     "heavy" in json ? json["heavy"].str : null
-    //                 );
-    //             }
-    //         }
-    //     }
-
-    //     return _dosage;
-    // }
 }

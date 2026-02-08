@@ -289,6 +289,10 @@ struct Bond3D
 
 class Conformer3D
 {
+package:
+    this() { }
+
+public:
     int cid;
     string id;
     Atom3D[] atoms;
@@ -299,11 +303,6 @@ class Conformer3D
     double volume;
     double selfOverlap;
     double[] multipoles;
-
-    package this()
-    {
-        
-    }
 
     bool isValid() const
         => atoms.length > 0;

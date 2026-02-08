@@ -39,27 +39,21 @@ Conformer3D[] getConformer3D(string TYPE)(int[] ids...)
 
 Conformer3D getConformer3D(string name)
 {
-    return internalGetConformer3D!("name")(name)[0];
+    return internalGetConformer3D!"name"(name)[0];
 }
 
-// string[] getSynonyms(string KIND)(string[] ids...)
-//     if (KIND == "cid" || KIND == "sid" || KIND == "name")
-// {
-//     orchestrator.rateLimit();
-//     orchestrator.client.get(
-//         orchestrator.buildURL("/compound/"~KIND~"/"~ids.join(",")~"/synonyms/JSON"), 
-//         (ubyte[] data) {
-//             JSONValue json = parseJSON(data.assumeUTF);
-//             if ("InformationList" in json && "Information" in json["InformationList"])
-//             {
-//                 JSONValue info = json["InformationList"]["Information"];
-//                 if (info.array.length > 0 && "Synonym" in info.array[0])
-//                 {
-//                     foreach (JSONValue syn; info.array[0]["Synonym"].array)
-//                         compound.synonyms ~= syn.str;
-//                 }
-//             }
-//         }, 
-//         null
-//     );
-// }
+string[][] getSynonyms(string TYPE)(int[] ids...)
+    if (TYPE == "cid" || TYPE == "sid")
+{
+    return internalGetSynonyms!TYPE(ids.map!(x => x.to!string).array.join(","));
+}
+
+string[] getSynonyms(string name)
+{
+    return internalGetSynonyms!"name"(name)[0];
+}
+
+Compound[] similaritySearch(int cid, int threshold = 90, int maxRecords = 10)
+{
+    return internalSimilaritySearch!"cid"(cid.to!string, threshold, maxRecords);
+}

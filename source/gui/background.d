@@ -1,7 +1,6 @@
 module gui.background;
 
 import std.math : sin, cos, PI;
-import std.typecons : Yes;
 import std.random : uniform01, uniform, Random, unpredictableSeed;
 import std.algorithm : min, max;
 
@@ -23,20 +22,39 @@ class Background : DrawingArea
     private double time = 0;
     private Random rng;
     private Splotch[] splotches;
-    private enum maxSplotches = 40;
-    private enum msPerFrame = 100;
-    private enum spawnMargin = 50.0;
-    private enum minRadius = 30.0;
-    private enum maxRadius = 120.0;
+    
+    // Configuration
+    private int maxSplotches = 40;
+    private int msPerFrame = 100;
+    private double spawnMargin = 50.0;
+    private double minRadius = 30.0;
+    private double maxRadius = 120.0;
+    private double minAlpha = 0.15;
+    private double maxAlpha = 0.35;
+    private string cssClass = "homepage-background";
+    private bool paintBase = true;
 
-    this()
+    this(int maxSplotches = 40, int msPerFrame = 100, double spawnMargin = 50.0,
+         double minRadius = 30.0, double maxRadius = 120.0,
+         double minAlpha = 0.15, double maxAlpha = 0.35,
+         string cssClass = "homepage-background", bool paintBase = true)
     {
+        this.maxSplotches = maxSplotches;
+        this.msPerFrame = msPerFrame;
+        this.spawnMargin = spawnMargin;
+        this.minRadius = minRadius;
+        this.maxRadius = maxRadius;
+        this.minAlpha = minAlpha;
+        this.maxAlpha = maxAlpha;
+        this.cssClass = cssClass;
+        this.paintBase = paintBase;
+        
         rng = Random(unpredictableSeed);
         
         setDrawFunc(&drawBackground);
-        addCssClass("homepage-background");
+        addCssClass(this.cssClass);
         
-        g_timeout_add(msPerFrame, cast(GSourceFunc)&onFrame, cast(void*)this);
+        g_timeout_add(this.msPerFrame, cast(GSourceFunc)&onFrame, cast(void*)this);
     }
 
     extern(C) static int onFrame(void* data)
@@ -84,7 +102,7 @@ class Background : DrawingArea
                 s.r = 0.70; s.g = 0.85; s.b = 1.0;
         }
 
-        s.alpha = uniform(0.15, 0.35, rng);
+        s.alpha = uniform(minAlpha, maxAlpha, rng);
         s.seed = uniform(0, 1000, rng);
 
         splotches ~= s;
@@ -120,13 +138,18 @@ class Background : DrawingArea
             int next2 = (i + 2) % points;
 
             // Control points for smooth bezier
-            double cp1x = cx + radii[i] * cos(angles[i]) + (radii[next] * cos(angles[next]) - radii[i] * cos(angles[i])) * 0.3;
-            double cp1y = cy + radii[i] * sin(angles[i]) + (radii[next] * sin(angles[next]) - radii[i] * sin(angles[i])) * 0.3;
+            double cp1x = cx + radii[i] * cos(angles[i]) + 
+                         (radii[next] * cos(angles[next]) - radii[i] * cos(angles[i])) * 0.3;
+            double cp1y = cy + radii[i] * sin(angles[i]) + 
+                         (radii[next] * sin(angles[next]) - radii[i] * sin(angles[i])) * 0.3;
 
-            double cp2x = cx + radii[next] * cos(angles[next]) - (radii[next2] * cos(angles[next2]) - radii[next] * cos(angles[next])) * 0.3;
-            double cp2y = cy + radii[next] * sin(angles[next]) - (radii[next2] * sin(angles[next2]) - radii[next] * sin(angles[next])) * 0.3;
+            double cp2x = cx + radii[next] * cos(angles[next]) - 
+                         (radii[next2] * cos(angles[next2]) - radii[next] * cos(angles[next])) * 0.3;
+            double cp2y = cy + radii[next] * sin(angles[next]) - 
+                         (radii[next2] * sin(angles[next2]) - radii[next] * sin(angles[next])) * 0.3;
 
-            cr.curveTo(cp1x, cp1y, cp2x, cp2y, cx + radii[next] * cos(angles[next]), cy + radii[next] * sin(angles[next]));
+            cr.curveTo(cp1x, cp1y, cp2x, cp2y, 
+                      cx + radii[next] * cos(angles[next]), cy + radii[next] * sin(angles[next]));
         }
 
         cr.closePath();
@@ -134,9 +157,12 @@ class Background : DrawingArea
 
     private void drawBackground(DrawingArea, Context cr, int width, int height)
     {
-        // White base
-        cr.setSourceRgb(1.0, 1.0, 1.0);
-        cr.paint();
+        if (paintBase)
+        {
+            // White base
+            cr.setSourceRgb(1.0, 1.0, 1.0);
+            cr.paint();
+        }
 
         // Draw all splotches with blending
         foreach (splotch; splotches)

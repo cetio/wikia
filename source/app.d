@@ -22,6 +22,7 @@ import gdk.display;
 import gtk.types : Orientation, Align, PolicyType, STYLE_PROVIDER_PRIORITY_APPLICATION, EventControllerScrollFlags;
 
 import wikia.pubchem;
+import wikia.psychonaut : DosageResult, getDosage;
 
 import gui.background : Background;
 import gui.home : Homepage;
@@ -65,6 +66,7 @@ class WikiaWindow : gtk.application_window.ApplicationWindow
         homepage = new Homepage();
         homepage.onSearch = &doSearch;
         homepage.onResultSelected = &onResultSelected;
+        homepage.onCompoundSelected = &onCompoundSelected;
         contentStack.addNamed(homepage, "homepage");
 
         articleView = new ArticleView();
@@ -139,23 +141,104 @@ class WikiaWindow : gtk.application_window.ApplicationWindow
     {
         writeln("[App] doSearch called with query: ", query);
         lastSearchCompound = getProperties(query);
-        writeln("[App] Search returned ", lastSearchCompound !is null ? 1 : 0, " results");
-        homepage.displayResults(query, lastSearchCompound);
+        
+        if (lastSearchCompound is null)
+        {
+            writeln("[App] No compound found");
+            homepage.displayResults(query, lastSearchCompound);
+            return;
+        }
+        
+        // Display primary result immediately
+        writeln("[App] Displaying primary result");
+        homepage.displayResults(query, lastSearchCompound, null);
+        
+        // Start asynchronous similarity search
+        import core.thread : Thread, msecs;
+        
+        int primaryCid = lastSearchCompound.cid;
+        
+        // Spawn thread for similarity search
+        auto similarSearchThread = new Thread({
+            try
+            {
+                auto similarCompounds = similaritySearch(primaryCid, 85, 10);
+                
+                // Filter out duplicates and limit results
+                Compound[] filteredCompounds;
+                foreach (compound; similarCompounds)
+                {
+                    if (compound.cid != primaryCid)
+                        filteredCompounds ~= compound;
+                }
+                
+                if (filteredCompounds.length > 4)
+                    filteredCompounds = filteredCompounds[0..4];
+                
+                // Small delay to ensure UI is ready
+                Thread.sleep(100.msecs);
+                
+                // Update UI
+                writeln("[App] Adding ", filteredCompounds.length, " similar compounds");
+                homepage.addSimilarResults(filteredCompounds);
+            }
+            catch (Exception e)
+            {
+                writeln("[App] Similarity search failed: ", e.msg);
+            }
+        });
+        similarSearchThread.start();
     }
 
     private void onResultSelected(int index)
     {
         writeln("[App] onResultSelected called with index: ", index);
-        if (lastSearchCompound is null)
+        // This method is kept for compatibility but not used
+    }
+
+    private void onCompoundSelected(int index, Compound compound)
+    {
+        writeln("[App] onCompoundSelected called with index: ", index, ", CID: ", compound.cid);
+        if (compound is null)
         {
             writeln("[App] No compound selected");
             return;
         }
 
-        titleLabel.label = "Wikia - "~lastSearchCompound.name;
-        updateArticleView(lastSearchCompound, lastSearchCompound.conformer3D, lastSearchCompound.name);
+        titleLabel.label = "Wikia - "~compound.name;
+        
+        Conformer3D conformer;
+        try
+        {
+            conformer = getConformer3D!"cid"(compound.cid)[0];
+        }
+        catch (Exception e)
+        {
+            writeln("[App] Failed to get conformer: ", e.msg);
+        }
+        
+        updateArticleView(compound, conformer, compound.name);
         showArticle();
-        writeln("[App] onResultSelected completed");
+        articleView.getInfobox().showLoading();
+
+        import core.thread : Thread;
+        auto dosageThread = new Thread({
+            try
+            {
+                writeln("[App] Fetching dosage for CID ", compound.cid);
+                auto result = getDosage(compound);
+                writeln("[App] Dosage result: ", result.dosages.length,
+                    " routes, fromSimilar=", result.fromSimilar);
+                articleView.getInfobox().setDosage(result);
+            }
+            catch (Exception e)
+            {
+                writeln("[App] Dosage fetch failed: ", e.msg);
+            }
+        });
+        dosageThread.start();
+
+        writeln("[App] onCompoundSelected completed");
     }
 
     private void updateArticleView(Compound compound, Conformer3D conformer, string name)
@@ -179,6 +262,7 @@ class WikiaWindow : gtk.application_window.ApplicationWindow
         lastSearchCompound = null;
         articleView.getInfobox().setConformer(null);
         articleView.getInfobox().setCompound(null);
+        articleView.getInfobox().reset();
         homepage.clearResults();
     }
 

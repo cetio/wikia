@@ -38,20 +38,18 @@
 
 .homepage-search-box {
     background: rgba(255, 255, 255, 0.9);
-    border: none;
+    border: 1px solid #a2a9b1;
     border-radius: 4px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
     padding: 4px;
 }
 
 .homepage-search-box:focus-within {
     border-color: #3366cc;
-    box-shadow: 0 1px 3px rgba(51, 102, 204, 0.15);
 }
 
 .homepage-search-entry {
-    min-height: 36px;
-    padding: 8px 12px;
+    min-height: 28px;
+    padding: 4px 12px;
     font-size: 1.05em;
     border: none;
     background: transparent;
@@ -66,10 +64,10 @@
     background: #3366cc;
     color: #ffffff;
     border-radius: 4px;
-    padding: 8px 20px;
+    padding: 6px 20px;
     font-size: 0.95em;
     font-weight: 500;
-    min-height: 36px;
+    min-height: 28px;
 }
 
 .homepage-search-button:hover {
@@ -93,8 +91,9 @@
 
 /* Search Results Styles */
 .search-results-container {
-    background: #ffffff;
-    padding: 24px;
+    background: transparent;
+    padding: 0;
+    border: none;
 }
 
 .search-results-header {
@@ -105,7 +104,7 @@
 }
 
 .search-result-row {
-    padding: 16px;
+    padding: 8px 16px;
     border-bottom: 1px solid #eaecf0;
     background: #ffffff;
 }
@@ -120,10 +119,48 @@
     color: #3366cc;
 }
 
+.similar-result {
+    background: #f5f5f5;
+}
+
+.similar-result:hover {
+    background: #eeeeee;
+}
+
+.loading-dots {
+    color: #000000;
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
+.loading-dots .dot {
+    margin: 0 1px;
+}
+
+.loading-dots .dot:nth-child(1) {
+    animation: bounce 1.5s infinite;
+}
+
+.loading-dots .dot:nth-child(2) {
+    animation: bounce 1.5s infinite 0.5s;
+}
+
+.loading-dots .dot:nth-child(3) {
+    animation: bounce 1.5s infinite 1s;
+}
+
+@keyframes bounce {
+    0%, 60%, 100% {
+        transform: translateY(0);
+    }
+    30% {
+        transform: translateY(-4px);
+    }
+}
+
 .search-result-detail {
     font-size: 0.9em;
     color: #72777d;
-    margin-top: 4px;
 }
 
 /* Error display styles */
@@ -139,23 +176,25 @@
 /* Home Button */
 .home-button {
     background: #f8f9fa;
-    border: 1px solid #a2a9b1;
+    border: 1px solid #202122;
     border-radius: 4px;
     padding: 12px;
     color: #202122;
+    opacity: 0;
+    transition: opacity 200ms ease-in-out;
 }
 
 .home-button:hover {
     background: #eaecf0;
+    opacity: 1;
 }
 
 /* Fullscreen Close Button */
 .fullscreen-close {
     background: #ffffff;
-    border: none;
+    border: 1px solid #202122;
     border-radius: 4px;
     color: #202122;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
 
 .fullscreen-close:hover {
@@ -192,19 +231,28 @@
 }
 
 .infobox {
-    background: #f8f9fa;
     border: 1px solid #a2a9b1;
     padding: 0;
     margin-bottom: 12px;
     margin-left: 16px;
+    background: transparent;
+}
+
+.infobox-background {
+    background: #ffffff;
+}
+
+.infobox-content {
+    background: transparent;
 }
 
 .infobox-title {
-    background: #eaecf0;
+    background: rgba(234, 236, 240, 0.85);
     padding: 8px 10px;
     font-weight: bold;
     font-size: 1.05em;
     border-bottom: 1px solid #a2a9b1;
+    color: #202122;
 }
 
 .infobox-viewer-frame {
@@ -213,18 +261,20 @@
 }
 
 .infobox-section-header {
-    background: #eaecf0;
+    background: rgba(255, 255, 255, 0.75);
     padding: 4px 10px;
     font-weight: bold;
     font-size: 0.9em;
     border-top: 1px solid #a2a9b1;
     border-bottom: 1px solid #a2a9b1;
+    color: #202122;
 }
 
 .infobox-row {
     padding: 4px 10px;
     border-bottom: 1px solid #eaecf0;
     font-size: 0.9em;
+    background: rgba(245, 245, 245, 0.80);
 }
 
 .infobox-label {
@@ -249,4 +299,26 @@
     color: rgba(255, 255, 255, 0.15);
     font-size: 4em;
     font-weight: bold;
+}
+
+.dosage-similar-warning {
+    color: #e67e22;
+    font-weight: 600;
+    font-size: 0.75em;
+    padding: 0 4px;
+}
+
+.dosage-route-header {
+    background: rgba(240, 240, 240, 0.85);
+    padding: 3px 10px;
+    font-weight: 600;
+    font-size: 0.85em;
+    color: #3366cc;
+    border-bottom: 1px solid #eaecf0;
+}
+
+.infobox-section-header-text {
+    font-weight: bold;
+    font-size: 0.9em;
+    color: #202122;
 }

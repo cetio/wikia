@@ -207,7 +207,6 @@ void drawTooltip(Context cr, string text, double x, double y, int width, int hei
     cr.textExtents(text, extents);
 
     double paddingX = 8;
-    double paddingY = 4;
     double boxWidth = extents.width + paddingX * 2;
     double boxHeight = 24;
     double boxX = x + 15;

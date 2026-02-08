@@ -5,44 +5,52 @@ import std.stdio : writeln;
 
 import gtk.box;
 import gtk.label;
-import gtk.button;
+import gtk.overlay;
 import gtk.gesture_click;
 import gtk.widget : Widget;
 import gtk.types : Orientation, Align;
 
+import gui.background : Background;
 import wikia.pubchem;
+import wikia.psychonaut : Dosage, DosageResult;
 import gui.article.viewer;
 
-class Infobox : Box
+class Infobox : Overlay
 {
     private Label compoundNameLabel;
     private Label cidLabel;
     private Label formulaLabel;
     private Label weightLabel;
     private Label smilesLabel;
-    private Box dosageSection;
     private MoleculeViewer moleculeViewer;
     private Compound currentCompound;
+    private Box chemicalSection;
+    private Box dosageSection;
+    private Box loadingDotsBox;
+    private Box content;
 
     void delegate() onViewerClick;
 
     this()
     {
-        super(Orientation.Vertical, 0);
+        super();
         addCssClass("infobox");
         valign = Align.Start;
         halign = Align.End;
-        widthRequest = 90;
+        widthRequest = 80;
         hexpand = false;
+
+        content = new Box(Orientation.Vertical, 0);
+        content.addCssClass("infobox-content");
 
         compoundNameLabel = new Label("Select");
         compoundNameLabel.addCssClass("infobox-title");
         compoundNameLabel.wrap = true;
         compoundNameLabel.maxWidthChars = 10;
-        compoundNameLabel.hexpand = false;
-        append(compoundNameLabel);
+        compoundNameLabel.hexpand = true;
+        content.append(compoundNameLabel);
 
-        moleculeViewer = new MoleculeViewer();
+        moleculeViewer = new MoleculeViewer(false);
         moleculeViewer.setContentWidth(88);
         moleculeViewer.setContentHeight(88);
         moleculeViewer.setBaseZoom(10.0);
@@ -52,15 +60,42 @@ class Infobox : Box
         viewerClick.connectReleased(&onViewerClicked);
         moleculeViewer.addController(viewerClick);
 
-        append(moleculeViewer);
+        content.append(moleculeViewer);
 
-        append(buildSection("Identifiers", ["CID", "Formula", "SMILES"],
-            [cidLabel = new Label("--"), formulaLabel = new Label("--"), smilesLabel = new Label("--")]));
+        chemicalSection = new Box(Orientation.Vertical, 0);
+        cidLabel = new Label("--");
+        formulaLabel = new Label("--");
+        smilesLabel = new Label("--");
+        weightLabel = new Label("--");
+        buildChemicalSection();
+        content.append(chemicalSection);
 
-        append(buildSection("Properties", ["Weight"], [weightLabel = new Label("--")]));
+        loadingDotsBox = buildLoadingDots();
+        loadingDotsBox.visible = false;
+        content.append(loadingDotsBox);
 
         dosageSection = new Box(Orientation.Vertical, 0);
-        append(dosageSection);
+        dosageSection.visible = false;
+        content.append(dosageSection);
+
+        Background bg = new Background(
+            6,      // maxSplotches
+            120,    // msPerFrame
+            10.0,   // spawnMargin
+            25.0,   // minRadius
+            65.0,   // maxRadius
+            0.55,   // minAlpha
+            0.85,   // maxAlpha
+            "infobox-background", // cssClass
+            true    // paintBase
+        );
+        bg.hexpand = true;
+        bg.vexpand = true;
+        setChild(bg);
+
+        addOverlay(content);
+        setMeasureOverlay(content, true);
+        setClipOverlay(content, true);
     }
 
     @property MoleculeViewer getViewer()
@@ -71,7 +106,6 @@ class Infobox : Box
     void setCompound(Compound compound)
     {
         currentCompound = compound;
-        //updateDosage();
     }
 
     void setConformer(Conformer3D conformer)
@@ -90,11 +124,80 @@ class Infobox : Box
 
         compoundNameLabel.label = name;
         cidLabel.label = compound.cid > 0 ? compound.cid.to!string : "--";
-        formulaLabel.label = compound.properties.formula.length > 0 ? compound.properties.formula : "--";
-        weightLabel.label = compound.properties.weight > 0 ? compound.properties.weight.to!string : "--";
-        smilesLabel.label = compound.smiles.length > 0 ? compound.smiles : "--";
+        formulaLabel.label = compound.properties.formula.length > 0
+            ? compound.properties.formula : "--";
+        weightLabel.label = compound.properties.weight > 0
+            ? compound.properties.weight.to!string : "--";
+        smilesLabel.label = compound.smiles.length > 0
+            ? compound.smiles : "--";
+    }
 
-        // updateDosage();
+    void showLoading()
+    {
+        clearBox(dosageSection);
+        dosageSection.visible = false;
+        loadingDotsBox.visible = true;
+    }
+
+    void hideLoading()
+    {
+        loadingDotsBox.visible = false;
+    }
+
+    void setDosage(DosageResult result)
+    {
+        writeln("[Infobox] setDosage called, ",
+            result.dosages.length, " routes, fromSimilar=",
+            result.fromSimilar);
+
+        hideLoading();
+        clearBox(dosageSection);
+
+        if (result.dosages.length == 0)
+        {
+            dosageSection.visible = false;
+            return;
+        }
+
+        Box hdrBox = new Box(Orientation.Horizontal, 4);
+        hdrBox.addCssClass("infobox-section-header");
+        hdrBox.halign = Align.Fill;
+
+        Label hdr = new Label("Dosage");
+        hdr.addCssClass("infobox-section-header-text");
+        hdr.halign = Align.Start;
+        hdr.hexpand = true;
+        hdr.xalign = 0;
+        hdrBox.append(hdr);
+
+        if (result.fromSimilar && result.sourceName !is null)
+        {
+            Label sourceLabel = new Label(result.sourceName);
+            sourceLabel.addCssClass("dosage-similar-warning");
+            sourceLabel.halign = Align.End;
+            sourceLabel.tooltipText = "Sourced from a similar compound";
+            hdrBox.append(sourceLabel);
+        }
+
+        dosageSection.append(hdrBox);
+
+        foreach (d; result.dosages)
+        {
+            Label routeLabel = new Label(d.route);
+            routeLabel.addCssClass("dosage-route-header");
+            routeLabel.halign = Align.Start;
+            routeLabel.xalign = 0;
+            dosageSection.append(routeLabel);
+
+            appendRow(dosageSection, "Bioavail.", d.bioavailability);
+            appendRow(dosageSection, "Threshold", d.threshold);
+            appendRow(dosageSection, "Light", d.light);
+            appendRow(dosageSection, "Common", d.common);
+            appendRow(dosageSection, "Strong", d.strong);
+            appendRow(dosageSection, "Heavy", d.heavy);
+        }
+
+        dosageSection.visible = true;
     }
 
     void reset()
@@ -105,135 +208,121 @@ class Infobox : Box
         weightLabel.label = "--";
         smilesLabel.label = "--";
 
-        Widget child = dosageSection.getFirstChild();
-        while (child !is null)
-        {
-            dosageSection.remove(child);
-            child = dosageSection.getFirstChild();
-        }
-
         currentCompound = null;
         moleculeViewer.setConformer(null);
+        hideLoading();
+        clearBox(dosageSection);
+        dosageSection.visible = false;
     }
 
-    // private void updateDosage()
-    // {
-    //     writeln("[Infobox] updateDosage called");
-    //     while (dosageSection.getFirstChild() !is null)
-    //     {
-    //         dosageSection.remove(dosageSection.getFirstChild());
-    //     }
+    private void buildChemicalSection()
+    {
+        Label sectionHdr = new Label("Chemical");
+        sectionHdr.addCssClass("infobox-section-header");
+        sectionHdr.halign = Align.Fill;
+        sectionHdr.xalign = 0;
+        chemicalSection.append(sectionHdr);
 
-    //     if (currentCompound is null)
-    //     {
-    //         writeln("[Infobox] No compound, showing no data");
-    //         Label noDataLabel = new Label("No dosage data available");
-    //         noDataLabel.addCssClass("infobox-value");
-    //         dosageSection.append(noDataLabel);
-    //         return;
-    //     }
+        Label idHdr = new Label("Identifiers");
+        idHdr.addCssClass("dosage-route-header");
+        idHdr.halign = Align.Start;
+        idHdr.xalign = 0;
+        chemicalSection.append(idHdr);
 
-    //     writeln("[Infobox] Checking dosage, compound: ", currentCompound.title);
-    //     auto dosages = currentCompound.dosage();
-    //     if (dosages.length == 0)
-    //     {
-    //         writeln("[Infobox] No dosage data");
-    //         Label noDataLabel = new Label("No dosage data available");
-    //         noDataLabel.addCssClass("infobox-value");
-    //         dosageSection.append(noDataLabel);
-    //         return;
-    //     }
+        appendLabelRow(chemicalSection, "CID", cidLabel);
+        appendLabelRow(chemicalSection, "Formula", formulaLabel);
+        // appendLabelRow(chemicalSection, "SMILES", smilesLabel);
 
-    //     writeln("[Infobox] Processing ", dosages.length, " dosages");
-    //     foreach (d; dosages)
-    //     {
-    //         if (d.threshold is null && d.light is null && d.common is null &&
-    //             d.strong is null && d.heavy is null)
-    //             continue;
+        Label propHdr = new Label("Properties");
+        propHdr.addCssClass("dosage-route-header");
+        propHdr.halign = Align.Start;
+        propHdr.xalign = 0;
+        chemicalSection.append(propHdr);
 
-    //         string r = d.route !is null ? d.route : "Unknown";
-    //         writeln("[Infobox] Adding route: ", r);
+        appendLabelRow(chemicalSection, "Weight", weightLabel);
+    }
 
-    //         Label hdr = new Label(r);
-    //         hdr.addCssClass("infobox-section-header");
-    //         hdr.halign = Align.Fill;
-    //         hdr.xalign = 0;
-    //         dosageSection.append(hdr);
+    private void appendLabelRow(Box parent, string label, Label value)
+    {
+        Box rowBox = new Box(Orientation.Horizontal, 8);
+        rowBox.addCssClass("infobox-row");
 
-    //         if (d.threshold !is null)
-    //             dosageSection.append(buildDosageRow("Threshold", d.threshold));
-    //         if (d.light !is null)
-    //             dosageSection.append(buildDosageRow("Light", d.light));
-    //         if (d.common !is null)
-    //             dosageSection.append(buildDosageRow("Common", d.common));
-    //         if (d.strong !is null)
-    //             dosageSection.append(buildDosageRow("Strong", d.strong));
-    //         if (d.heavy !is null)
-    //             dosageSection.append(buildDosageRow("Heavy", d.heavy));
-    //     }
-    //     writeln("[Infobox] updateDosage completed");
-    // }
+        Label labelWidget = new Label(label);
+        labelWidget.addCssClass("infobox-label");
+        labelWidget.halign = Align.Start;
+        labelWidget.valign = Align.Start;
 
-    // private Box buildDosageRow(string label, string value)
-    // {
-    //     Box rowBox = new Box(Orientation.Horizontal, 8);
-    //     rowBox.addCssClass("infobox-row");
+        value.addCssClass("infobox-value");
+        value.halign = Align.End;
+        value.hexpand = true;
+        value.wrap = true;
+        value.maxWidthChars = 8;
 
-    //     Label labelWidget = new Label(label);
-    //     labelWidget.addCssClass("infobox-label");
-    //     labelWidget.halign = Align.Start;
-    //     labelWidget.valign = Align.Start;
+        rowBox.append(labelWidget);
+        rowBox.append(value);
+        parent.append(rowBox);
+    }
 
-    //     Label valueWidget = new Label(value);
-    //     valueWidget.addCssClass("infobox-value");
-    //     valueWidget.halign = Align.End;
-    //     valueWidget.hexpand = true;
-    //     valueWidget.wrap = true;
-    //     valueWidget.maxWidthChars = 8;
+    private void appendRow(Box parent, string label, string value)
+    {
+        if (value is null || value.length == 0)
+            return;
 
-    //     rowBox.append(labelWidget);
-    //     rowBox.append(valueWidget);
+        Box rowBox = new Box(Orientation.Horizontal, 8);
+        rowBox.addCssClass("infobox-row");
 
-    //     return rowBox;
-    // }
+        Label labelWidget = new Label(label);
+        labelWidget.addCssClass("infobox-label");
+        labelWidget.halign = Align.Start;
+        labelWidget.valign = Align.Start;
+
+        Label valueWidget = new Label(value);
+        valueWidget.addCssClass("infobox-value");
+        valueWidget.halign = Align.End;
+        valueWidget.hexpand = true;
+        valueWidget.wrap = true;
+        valueWidget.maxWidthChars = 8;
+
+        rowBox.append(labelWidget);
+        rowBox.append(valueWidget);
+        parent.append(rowBox);
+    }
+
+    private void clearBox(Box box)
+    {
+        Widget child = box.getFirstChild();
+        while (child !is null)
+        {
+            Widget next = child.getNextSibling();
+            box.remove(child);
+            child = next;
+        }
+    }
+
+    private Box buildLoadingDots()
+    {
+        Box dots = new Box(Orientation.Horizontal, 1);
+        dots.addCssClass("loading-dots");
+        dots.halign = Align.Center;
+        dots.marginTop = 8;
+        dots.marginBottom = 8;
+
+        auto dot1 = new Label(".");
+        dot1.addCssClass("dot");
+        auto dot2 = new Label(".");
+        dot2.addCssClass("dot");
+        auto dot3 = new Label(".");
+        dot3.addCssClass("dot");
+
+        dots.append(dot1);
+        dots.append(dot2);
+        dots.append(dot3);
+        return dots;
+    }
 
     private void onViewerClicked(int nPress, double x, double y)
     {
         if (onViewerClick !is null)
             onViewerClick();
-    }
-
-    private Box buildSection(string title, string[] labels, Label[] values)
-    {
-        Box section = new Box(Orientation.Vertical, 0);
-
-        Label hdr = new Label(title);
-        hdr.addCssClass("infobox-section-header");
-        hdr.halign = Align.Fill;
-        hdr.xalign = 0;
-        section.append(hdr);
-
-        foreach (i, label; labels)
-        {
-            Box rowBox = new Box(Orientation.Horizontal, 8);
-            rowBox.addCssClass("infobox-row");
-
-            Label labelWidget = new Label(label);
-            labelWidget.addCssClass("infobox-label");
-            labelWidget.halign = Align.Start;
-            labelWidget.valign = Align.Start;
-
-            values[i].addCssClass("infobox-value");
-            values[i].halign = Align.End;
-            values[i].hexpand = true;
-            values[i].wrap = true;
-            values[i].maxWidthChars = 8;
-
-            rowBox.append(labelWidget);
-            rowBox.append(values[i]);
-            section.append(rowBox);
-        }
-
-        return section;
     }
 }

@@ -1,121 +1,93 @@
-// module wikia.page;
+module wikia.page;
 
-// import std.regex;
-// import std.string : strip;
-// import wikia.psychonaut : Psychonaut;
-// import wikia.wikipedia : Wikipedia;
+import std.regex;
+import std.string : strip;
 
-// class Page
-// {
-//     string title;
-//     string source;
-//     string url;
-//     Section[] sections;
-//     Metadata metadata;
-//     string[] authors;
-//     string raw;
+struct Section
+{
+    string heading;
+    string content;
+    int level;
+}
 
-//     this(string title, string db = "psychonaut")
-//     {
-//         this.title = title;
-//         this.source = db;
+class Page
+{
+    string title;
+    string source;
+    string url;
+    Section[] _sections;
+    string _raw;
 
-//         if (db == "psychonaut")
-//         {
-//             this.url = "https://psychonautwiki.org/wiki/"~title;
-//             Psychonaut.getContent(this);
-//         }
-//         else if (db == "wikipedia")
-//         {
-//             this.url = "https://en.wikipedia.org/wiki/"~title;
-//             Wikipedia.getContent(this);
-//         }
-//         else if (db == "pmc")
-//         {
-//             this.url = "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC"~title;
-//         }
-//         else
-//             throw new Exception("Unknown DB: "~db);
-//     }
+    private void delegate(Page) _fetchContent;
 
-//     string fulltext() const
-//     {
-//         import std.array : join;
-//         import std.algorithm : map;
-//         if (sections.length == 0)
-//             return "";
-//         return sections.map!(s => s.content).join("\n\n");
-//     }
+    package this() { }
 
-//     string doi() const { return metadata.get("doi"); }
-//     string pmid() const { return metadata.get("pmid"); }
-//     string pmcId() const { return metadata.get("pmcId"); }
-// }
+    this(string title, string source, string url,
+        void delegate(Page) fetchContent)
+    {
+        this.title = title;
+        this.source = source;
+        this.url = url;
+        this._fetchContent = fetchContent;
+    }
 
-// struct Section
-// {
-//     string heading;
-//     string content;
-//     int level;
-// }
+    ref string raw()
+    {
+        if (_raw is null && _fetchContent !is null)
+        {
+            _fetchContent(this);
+            _fetchContent = null;
+        }
+        return _raw;
+    }
 
-// struct Metadata
-// {
-//     string[string] fields;
+    Section[] sections()
+    {
+        if (_sections.length == 0 && raw !is null)
+            _sections = parseSections(_raw);
 
-//     string get(string key) const
-//     {
-//         if (key in fields)
-//             return fields[key];
-//         return null;
-//     }
-// }
+        return _sections;
+    }
 
-// Section[] parseSections(string wikitext)
-// {
-//     Section[] ret;
-//     if (!wikitext.length)
-//         return ret;
+    string fulltext() const
+    {
+        import std.array : join;
+        import std.algorithm : map;
+        if (_sections.length == 0)
+            return "";
+        return _sections.map!(s => s.content).join("\n\n");
+    }
+}
 
-//     enum headingRe = ctRegex!(r"(={2,6})\s*([^=]+?)\s*\1");
+Section[] parseSections(string wikitext)
+{
+    Section[] ret;
+    if (!wikitext.length)
+        return ret;
 
-//     size_t lastEnd;
-//     string lastHeading;
-//     int lastLevel;
-//     foreach (match; matchAll(wikitext, headingRe))
-//     {
-//         size_t start = match.pre.length;
-//         int level = cast(int)match[1].length;
-//         string heading = match[2].strip;
+    enum headingRe = ctRegex!(r"(={2,6})\s*([^=]+?)\s*\1");
 
-//         if (lastHeading.length)
-//             ret ~= Section(lastHeading, wikitext[lastEnd..start].strip, lastLevel);
+    size_t lastEnd;
+    string lastHeading;
+    int lastLevel;
+    foreach (match; matchAll(wikitext, headingRe))
+    {
+        size_t start = match.pre.length;
+        int level = cast(int) match[1].length;
+        string heading = match[2].strip;
 
-//         lastHeading = heading;
-//         lastLevel = level;
-//         lastEnd = start + match.hit.length;
-//     }
+        if (lastHeading.length)
+            ret ~= Section(lastHeading,
+                wikitext[lastEnd .. start].strip, lastLevel);
 
-//     if (lastHeading.length)
-//         ret ~= Section(lastHeading, wikitext[lastEnd..$].strip, lastLevel);
+        lastHeading = heading;
+        lastLevel = level;
+        lastEnd = start + match.hit.length;
+    }
 
-//     return ret;
-// }
+    if (lastHeading.length)
+        ret ~= Section(lastHeading,
+            wikitext[lastEnd .. $].strip, lastLevel);
 
-// Metadata parseMetadata(string wikitext)
-// {
-//     Metadata ret;
-//     if (!wikitext.length)
-//         return ret;
-
-//     enum templateRe = ctRegex!(r"\{\{([^}]+)\}\}");
-//     enum pairRe = ctRegex!(r"\|\s*([^=\s]+)\s*=\s*([^|]*)");
-
-//     foreach (match; matchAll(wikitext, templateRe))
-//     {
-//         foreach (pairMatch; matchAll(match[1], pairRe))
-//             ret.fields[pairMatch[1].strip] = pairMatch[2].strip;
-//     }
-
-//     return ret;
-// }
+    return ret;
+}
