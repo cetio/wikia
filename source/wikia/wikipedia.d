@@ -1,105 +1,145 @@
-// module wikia.wikipedia;
+module wikia.wikipedia;
 
-// import wikia.composer;
-// import std.json : JSONValue, parseJSON, JSONType;
-// import std.conv : to;
-// import std.string : assumeUTF, strip;
-// import std.regex;
-// import std.algorithm : canFind;
-// import wikia.page;
+import std.json : JSONValue, parseJSON, JSONType;
+import std.conv : to;
+import std.string : assumeUTF, strip;
+import std.regex : matchAll, ctRegex;
+import std.array : join;
+import std.algorithm : canFind;
+import std.functional : toDelegate;
 
-// class Wikipedia
-// {
-//     static Orchestrator orchestrator = Orchestrator("https://en.wikipedia.org/w", 200);
+import wikia.composer;
+import wikia.page;
 
-//     private static JSONValue query(string[string] params)
-//     {
-//         JSONValue json;
-//         params["format"] = "json";
-//         params["formatversion"] = "2";
+private:
 
-//         orchestrator.rateLimit();
-//         orchestrator.client.get(
-//             orchestrator.buildURL("/api.php", params), 
-//             (ubyte[] data) {
-//                 json = parseJSON(data.assumeUTF);
-//             }, 
-//             null
-//         );
-//         return json;
-//     }
+static Orchestrator orchestrator =
+    Orchestrator("https://en.wikipedia.org/w", 200);
 
-//     static void getContent(Page page)
-//     {
-//         JSONValue json = query(["action": "parse", "prop": "wikitext", "page": page.title]);
+JSONValue query(string[string] params)
+{
+    JSONValue json;
+    params["format"] = "json";
+    params["formatversion"] = "2";
 
-//         if ("parse" !in json || "wikitext" !in json["parse"])
-//             return;
+    orchestrator.rateLimit();
+    orchestrator.client.get(
+        orchestrator.buildURL("/api.php", params),
+        (ubyte[] data) {
+            json = parseJSON(data.assumeUTF);
+        },
+        null
+    );
+    return json;
+}
 
-//         JSONValue wikitext = json["parse"]["wikitext"];
+void fetchContent(Page page)
+{
+    JSONValue json = query([
+        "action": "parse", "prop": "wikitext",
+        "page": page.title
+    ]);
+    if ("parse" !in json || "wikitext" !in json["parse"])
+        return;
 
-//         if (wikitext.type == JSONType.object && "*" in wikitext)
-//             page.raw = wikitext["*"].str;
-//         else if (wikitext.type == JSONType.string)
-//             page.raw = wikitext.str;
+    JSONValue wikitext = json["parse"]["wikitext"];
 
-//         page.sections = parseSections(page.raw);
-//         page.metadata = parseMetadata(page.raw);
-//         // TODO: Metadata should be parsed by source.
-//         page.parseDosage();
-//     }
+    if (wikitext.type == JSONType.object && "*" in wikitext)
+        page._raw = wikitext["*"].str;
+    else if (wikitext.type == JSONType.string)
+        page._raw = wikitext.str;
+}
 
-//     static Page[] search(string term, int limit = 10, int offset = 0, string ns = "0")
-//     {
-//         Page[] pages;
-//         JSONValue json = query([
-//             "action": "query", "list": "search", "srsearch": term,
-//             "srlimit": limit.to!string, "sroffset": offset.to!string,
-//             "srnamespace": ns, "srprop": "snippet|titlesnippet"
-//         ]);
+public:
 
-//         if (json.type == JSONType.null_ || "query" !in json || "search" !in json["query"])
-//             return pages;
+Page[] getPages(string DB)(string term, int limit = 10)
+    if (DB == "wikipedia")
+{
+    JSONValue json = query([
+        "action": "query", "list": "search",
+        "srsearch": term,
+        "srlimit": limit.to!string, "srnamespace": "0",
+        "srprop": "snippet|titlesnippet"
+    ]);
 
-//         foreach (JSONValue item; json["query"]["search"].array)
-//             pages ~= new Page(item["title"].str, "wikipedia");
-//         return pages;
-//     }
+    if ("query" !in json || "search" !in json["query"])
+        return [];
 
-//     static string[] extractCIDs(Page page)
-//     {
-//         string[] cids;
-//         enum pubChemRe = ctRegex!`PubChem\s*=\s*(\d+)`;
-//         foreach (match; matchAll(page.raw, pubChemRe))
-//         {
-//             string cid = strip(match[1]);
-//             if (cid.length && !cids.canFind(cid))
-//                 cids ~= cid;
-//         }
+    Page[] ret;
+    foreach (JSONValue res; json["query"]["search"].array)
+    {
+        string title = res["title"].str;
+        ret ~= new Page(title, "wikipedia",
+            "https://en.wikipedia.org/wiki/"~title,
+            toDelegate(&fetchContent));
+        if (ret.length >= limit)
+            break;
+    }
+    return ret;
+}
 
-//         enum pubChemCidRe = ctRegex!`PubChemCID\s*=\s*(\d+)`;
-//         foreach (match; matchAll(page.raw, pubChemCidRe))
-//         {
-//             string cid = strip(match[1]);
-//             if (cid.length && !cids.canFind(cid))
-//                 cids ~= cid;
-//         }
+Page[] getPagesByTitle(string DB)(string[] titles...)
+    if (DB == "wikipedia")
+{
+    if (titles.length == 0)
+        return [];
 
-//         enum pubChemTemplateRe = ctRegex!`\{\{\s*PubChem\s*\|\s*(\d+)\s*\}\}`;
-//         foreach (match; matchAll(page.raw, pubChemTemplateRe))
-//         {
-//             string cid = strip(match[1]);
-//             if (cid.length && !cids.canFind(cid))
-//                 cids ~= cid;
-//         }
+    JSONValue json = query([
+        "action": "query",
+        "titles": titles.join("|"),
+        "prop": ""
+    ]);
 
-//         enum pubChemUrlRe = ctRegex!`https?://(?:www\.)?pubchem\.ncbi\.nlm\.nih\.gov/compound/(\d+)`;
-//         foreach (match; matchAll(page.raw, pubChemUrlRe))
-//         {
-//             string cid = strip(match[1]);
-//             if (cid.length && !cids.canFind(cid))
-//                 cids ~= cid;
-//         }
-//         return cids;
-//     }
-// }
+    if ("query" !in json || "pages" !in json["query"])
+        return [];
+
+    Page[] ret;
+    foreach (JSONValue pg; json["query"]["pages"].array)
+    {
+        if ("missing" in pg)
+            continue;
+            
+        string title = pg["title"].str;
+        ret ~= new Page(title, "wikipedia",
+            "https://en.wikipedia.org/wiki/"~title,
+            toDelegate(&fetchContent));
+    }
+    return ret;
+}
+
+string[] extractCIDs(Page page)
+{
+    string[] cids;
+    enum pubChemRe = ctRegex!`PubChem\s*=\s*(\d+)`;
+    foreach (match; matchAll(page.raw, pubChemRe))
+    {
+        string cid = strip(match[1]);
+        if (cid.length && !cids.canFind(cid))
+            cids ~= cid;
+    }
+
+    enum pubChemCidRe = ctRegex!`PubChemCID\s*=\s*(\d+)`;
+    foreach (match; matchAll(page.raw, pubChemCidRe))
+    {
+        string cid = strip(match[1]);
+        if (cid.length && !cids.canFind(cid))
+            cids ~= cid;
+    }
+
+    enum pubChemTemplateRe = ctRegex!`\{\{\s*PubChem\s*\|\s*(\d+)\s*\}\}`;
+    foreach (match; matchAll(page.raw, pubChemTemplateRe))
+    {
+        string cid = strip(match[1]);
+        if (cid.length && !cids.canFind(cid))
+            cids ~= cid;
+    }
+
+    enum pubChemUrlRe = ctRegex!`https?://(?:www\.)?pubchem\.ncbi\.nlm\.nih\.gov/compound/(\d+)`;
+    foreach (match; matchAll(page.raw, pubChemUrlRe))
+    {
+        string cid = strip(match[1]);
+        if (cid.length && !cids.canFind(cid))
+            cids ~= cid;
+    }
+    return cids;
+}

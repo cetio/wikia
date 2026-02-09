@@ -4,8 +4,9 @@ import std.json : JSONValue, parseJSON, JSONType;
 import std.conv : to;
 import std.string : assumeUTF, strip, toLower, indexOf;
 import std.regex : matchAll, ctRegex;
-import std.array : replace;
-import std.algorithm : canFind, min;
+import std.array : replace, join;
+import std.algorithm : canFind, min, map, filter;
+import std.math : abs, isNaN;
 import std.functional : toDelegate;
 
 import wikia.composer;
@@ -71,7 +72,61 @@ Page[] getPages(string DB)(string term, int limit = 10)
     {
         string title = res["title"].str;
         ret ~= new Page(title, "psychonaut",
-            "https://psychonautwiki.org/wiki/" ~ title,
+            "https://psychonautwiki.org/wiki/"~title,
+            toDelegate(&fetchContent));
+        if (ret.length >= limit)
+            break;
+    }
+    return ret;
+}
+
+Page[] getPagesByTitle(string DB)(string[] titles...)
+    if (DB == "psychonaut")
+{
+    if (titles.length == 0)
+        return [];
+
+    JSONValue json = query([
+        "action": "query",
+        "titles": titles.join("|"),
+        "prop": ""
+    ]);
+
+    if ("query" !in json || "pages" !in json["query"])
+        return [];
+
+    Page[] ret;
+    foreach (JSONValue pg; json["query"]["pages"].array)
+    {
+        if ("missing" in pg)
+            continue;
+            
+        string title = pg["title"].str;
+        ret ~= new Page(title, "psychonaut",
+            "https://psychonautwiki.org/wiki/"~title,
+            toDelegate(&fetchContent));
+    }
+    return ret;
+}
+
+Page[] getReports(string substance, int limit = 20)
+{
+    JSONValue json = query([
+        "action": "query", "list": "search",
+        "srsearch": "intitle:Experience:"~substance,
+        "srlimit": limit.to!string, "srnamespace": "0",
+        "srprop": "snippet|titlesnippet"
+    ]);
+
+    if ("query" !in json || "search" !in json["query"])
+        return [];
+
+    Page[] ret;
+    foreach (JSONValue res; json["query"]["search"].array)
+    {
+        string title = res["title"].str;
+        ret ~= new Page(title, "psychonaut",
+            "https://psychonautwiki.org/wiki/"~title,
             toDelegate(&fetchContent));
         if (ret.length >= limit)
             break;
@@ -93,17 +148,16 @@ struct Dosage
 struct DosageResult
 {
     Dosage[] dosages;
-    bool fromSimilar;
-    string sourceName;
+    Compound source;
 }
 
-DosageResult getDosage(Compound compound, bool similarity = true)
+DosageResult getDosage(Compound compound)
 {
     Dosage[] tryParseDosage(string pageTitle)
     {
         JSONValue json = query([
             "action": "parse", "prop": "wikitext",
-            "page": "Template:SubstanceBox/" ~ pageTitle
+            "page": "Template:SubstanceBox/"~pageTitle
         ]);
         if ("parse" !in json || "wikitext" !in json["parse"])
             return [];
@@ -132,42 +186,87 @@ DosageResult getDosage(Compound compound, bool similarity = true)
         return false;
     }
 
-    string[] syns = compound.synonyms;
+    // 1. Fetch all similar compounds (CIDs only) - includes primary compound
+    Compound[] similar = similaritySearch(compound.cid, 90, 5);
+    int[] simCids;
+    foreach (sim; similar)
+        simCids ~= sim.cid;
 
-    Page[] pages = getPages!"psychonaut"(compound.name);
-    foreach (page; pages)
+    if (simCids.length == 0)
+        return DosageResult([], null);
+
+    // 2. Batch get properties for all similar CIDs
+    Compound[] withProps = getProperties!"cid"(simCids);
+
+    // 3. Filter by XLogP difference > 0.5 or MW difference > 8%
+    // Always include the primary compound (diff = 0)
+    double refXLogP = compound.properties.xlogp;
+    double refMW = compound.properties.weight;
+    Compound[] filtered;
+    foreach (sim; withProps)
     {
-        if (isExactPage(page.title, syns))
+        // Always include the primary compound
+        if (sim.cid == compound.cid)
         {
-            Dosage[] d = tryParseDosage(page.title);
-            if (d.length > 0)
-                return DosageResult(d, false, null);
+            filtered ~= sim;
+            continue;
         }
+        
+        if (!isNaN(refXLogP) && !isNaN(sim.properties.xlogp))
+        {
+            if (abs(sim.properties.xlogp - refXLogP) > 0.5)
+                continue;
+        }
+        if (!isNaN(refMW) && refMW > 0 && !isNaN(sim.properties.weight) && sim.properties.weight > 0)
+        {
+            if (abs(sim.properties.weight - refMW) / refMW > 0.08)
+                continue;
+        }
+        filtered ~= sim;
     }
 
-    if (!similarity)
-        return DosageResult([], false, null);
+    if (filtered.length == 0)
+        return DosageResult([], null);
 
-    Compound[] similar = similaritySearch(compound.cid, 90, 5);
-    foreach (sim; similar[0 .. min($, 5)])
+    // 4. Batch fetch psychonaut pages by compound names
+    string[] names;
+    foreach (sim; filtered)
+        names ~= sim.name;
+    Page[] simPages = getPagesByTitle!"psychonaut"(names);
+
+    // 5. Batch get synonyms for filtered CIDs
+    int[] filteredCids;
+    foreach (sim; filtered)
+        filteredCids ~= sim.cid;
+    string[][] allSyns = getSynonyms!"cid"(filteredCids);
+
+    // Build CID -> synonyms map
+    string[][int] synsByCid;
+    foreach (i, sim; filtered)
     {
-        if (sim.cid == compound.cid)
-            continue;
+        if (i < allSyns.length)
+            synsByCid[sim.cid] = allSyns[i];
+    }
 
-        string[] simSyns = sim.synonyms;
-        Page[] simPages = getPages!"psychonaut"(sim.name);
+    // 6. Match synonyms to pages and extract dosage
+    foreach (sim; filtered)
+    {
+        string[] simSyns = sim.cid in synsByCid ? synsByCid[sim.cid] : [];
         foreach (page; simPages)
         {
             if (isExactPage(page.title, simSyns))
             {
                 Dosage[] d = tryParseDosage(page.title);
                 if (d.length > 0)
-                    return DosageResult(d, true, sim.name);
+                {
+                    Compound source = (sim.cid == compound.cid) ? null : sim;
+                    return DosageResult(d, source);
+                }
             }
         }
     }
 
-    return DosageResult([], false, null);
+    return DosageResult([], null);
 }
 
 Dosage[] parseDosageText(string raw)
@@ -200,7 +299,7 @@ Dosage[] parseDosageText(string raw)
 
     enum roaRe = ctRegex!(
         `\|\s*(\w+)ROA_(Bioavailability|Threshold|Light|Common|Strong|Heavy)`
-        ~ `\s*=\s*([^\n|]+)`);
+       ~`\s*=\s*([^\n|]+)`);
     foreach (m; matchAll(raw, roaRe))
     {
         string range = cleanValue(m[3], m[2]);

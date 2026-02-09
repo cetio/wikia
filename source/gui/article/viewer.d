@@ -1,11 +1,13 @@
 module gui.article.viewer;
 
-import gtk.drawing_area;
-import gtk.gesture_drag;
-import gtk.event_controller_scroll;
-import gtk.event_controller_motion;
-import gtk.types : EventControllerScrollFlags;
 import cairo.context : Context;
+import cairo.types : TextExtents;
+
+import gtk.drawing_area;
+import gtk.event_controller_motion;
+import gtk.event_controller_scroll;
+import gtk.gesture_drag;
+import gtk.types : EventControllerScrollFlags;
 
 import gui.conformer.camera : Camera;
 import gui.conformer.hit : HitResult, hitTest;
@@ -17,14 +19,16 @@ class MoleculeViewer : DrawingArea
 {
     private:
 
-    struct HoverState 
+    struct HoverState
     {
         int atomId = -1;
         size_t bondIdx = size_t.max;
         string tooltip;
         double x, y;
+
         bool isValid() const => atomId != -1 || bondIdx != size_t.max;
-        void clear() 
+
+        void clear()
         {
             atomId = -1;
             bondIdx = size_t.max;

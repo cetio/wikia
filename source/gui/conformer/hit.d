@@ -29,7 +29,7 @@ HitResult hitTest(double mouseX, double mouseY, int width, int height, Conformer
     double my = mouseY - centerY;
 
     double closestAtomDist = double.max;
-    int newHoveredAtomId = -1;
+    int hoveredAtomId = -1;
 
     foreach (atom; conformer.atoms)
     {
@@ -41,21 +41,21 @@ HitResult hitTest(double mouseX, double mouseY, int width, int height, Conformer
 
         if (dist <= radius && dist < closestAtomDist)
         {
-            newHoveredAtomId = atom.aid;
+            hoveredAtomId = atom.aid;
             closestAtomDist = dist;
         }
     }
 
-    if (newHoveredAtomId != -1)
+    if (hoveredAtomId != -1)
     {
         ret.hit = true;
         ret.isAtom = true;
-        ret.atomId = newHoveredAtomId;
+        ret.atomId = hoveredAtomId;
         return ret;
     }
 
     double closestBondDist = double.max;
-    size_t newHoveredBondIndex = -1;
+    size_t hoveredBondIdx = size_t.max;
 
     foreach (size_t i, bond; conformer.bonds)
     {
@@ -74,16 +74,16 @@ HitResult hitTest(double mouseX, double mouseY, int width, int height, Conformer
 
         if (dist <= bondWidth && dist < closestBondDist)
         {
-            newHoveredBondIndex = i;
+            hoveredBondIdx = i;
             closestBondDist = dist;
         }
     }
 
-    if (newHoveredBondIndex != size_t.max)
+    if (hoveredBondIdx != size_t.max)
     {
         ret.hit = true;
         ret.isAtom = false;
-        ret.bondIdx = newHoveredBondIndex;
+        ret.bondIdx = hoveredBondIdx;
     }
 
     return ret;

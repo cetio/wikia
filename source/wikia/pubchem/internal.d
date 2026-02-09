@@ -21,8 +21,8 @@ static Orchestrator orchestrator = Orchestrator("https://pubchem.ncbi.nlm.nih.go
 Compound[] internalGetProperties(string TYPE)(string str)
 {
     string[] props = [
-        "Title", "SMILES", "IUPACName", "InChI", 
-        "MolecularFormula", "MolecularWeight", "ExactMass", "Charge", "TPSA"
+        "Title", "SMILES", "IUPACName", "InChI",
+        "MolecularFormula", "MolecularWeight", "ExactMass", "Charge", "TPSA", "XLogP"
     ];
 
     Compound[] ret;
@@ -47,7 +47,8 @@ Compound[] internalGetProperties(string TYPE)(string str)
                     "MolecularWeight" in props ? props["MolecularWeight"].str.to!double : double.nan,
                     "ExactMass" in props ? props["ExactMass"].str.to!double : double.nan,
                     "Charge" in props ? props["Charge"].get!int : 0,
-                    "TPSA" in props ? props["TPSA"].get!double : double.nan
+                    "TPSA" in props ? props["TPSA"].get!double : double.nan,
+                    "XLogP" in props ? props["XLogP"].get!double : double.nan
                 );
                 ret ~= compound;
             }

@@ -21,11 +21,10 @@ class Homepage : Box
     private ListBox suggestionList;
     private Box loadingDots;
     private Compound[] pendingSimilarCompounds;
-    private bool isLoading = false;
+    private bool isLoading;
     private Compound lastSearchCompound;
 
     void delegate(string query) onSearch;
-    void delegate(int index) onResultSelected;
     void delegate(int index, Compound compound) onCompoundSelected;
 
     this()
@@ -52,40 +51,38 @@ class Homepage : Box
         Box content = buildContent();
         centeringBox.append(content);
         overlay.addOverlay(centeringBox);
-        
+
         append(overlay);
         writeln("[Homepage] Constructor completed");
     }
 
     private Box buildContent()
     {
-        auto content = new Box(Orientation.Vertical, 0);
+        Box content = new Box(Orientation.Vertical, 0);
         content.addCssClass("homepage-content");
         content.hexpand = false;
         content.halign = Align.Center;
         content.valign = Align.Start;
 
-        // Fixed header with logo, tagline, and search
-        auto headerBox = new Box(Orientation.Vertical, 0);
+        Box headerBox = new Box(Orientation.Vertical, 0);
         headerBox.halign = Align.Center;
         headerBox.valign = Align.Start;
-        
+
         headerBox.append(buildLogo());
         headerBox.append(buildTagline());
         headerBox.append(buildSearch());
-        
-        // Scrollable results area
-        auto scrollableBox = new Box(Orientation.Vertical, 0);
+
+        Box scrollableBox = new Box(Orientation.Vertical, 0);
         scrollableBox.addCssClass("search-results-container");
         scrollableBox.hexpand = true;
         scrollableBox.vexpand = true;
-        
+
         suggestionList = new ListBox();
         suggestionList.addCssClass("search-results-container");
         suggestionList.connectRowActivated(&onRowActivated);
         suggestionList.visible = false;
         scrollableBox.append(suggestionList);
-        
+
         content.append(headerBox);
         content.append(scrollableBox);
         content.append(buildLinks());
@@ -442,9 +439,9 @@ class Homepage : Box
     private void onRowActivated(ListBoxRow row)
     {
         writeln("[Homepage] onRowActivated called");
-        if (row is null || onResultSelected is null)
+        if (row is null)
         {
-            writeln("[Homepage] Row is null or no handler");
+            writeln("[Homepage] Row is null");
             return;
         }
 

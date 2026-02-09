@@ -5,6 +5,7 @@ import std.file : exists, readText;
 import std.stdio : writeln;
 import std.algorithm;
 import std.array;
+import core.thread;
 
 import gio.types : ApplicationFlags;
 import gtk.application;
@@ -34,8 +35,6 @@ class WikiaWindow : gtk.application_window.ApplicationWindow
 {
     private Homepage homepage;
     private ArticleView articleView;
-    private Compound selectedCompound;
-    private Conformer3D selectedConformer;
     private Compound lastSearchCompound;
     private Box fullscreenBox;
     private MoleculeViewer fullscreenViewer;
@@ -65,7 +64,6 @@ class WikiaWindow : gtk.application_window.ApplicationWindow
 
         homepage = new Homepage();
         homepage.onSearch = &doSearch;
-        homepage.onResultSelected = &onResultSelected;
         homepage.onCompoundSelected = &onCompoundSelected;
         contentStack.addNamed(homepage, "homepage");
 
@@ -129,7 +127,9 @@ class WikiaWindow : gtk.application_window.ApplicationWindow
 
     private void onMoleculeViewerClick()
     {
-        if (lastSearchCompound !is null && lastSearchCompound.conformer3D !is null && lastSearchCompound.conformer3D.isValid())
+        if (lastSearchCompound !is null 
+            && lastSearchCompound.conformer3D !is null 
+            && lastSearchCompound.conformer3D.isValid())
         {
             fullscreenViewer.setConformer(lastSearchCompound.conformer3D);
             fullscreenViewer.setBackgroundName(lastSearchCompound.name);
@@ -149,38 +149,32 @@ class WikiaWindow : gtk.application_window.ApplicationWindow
             return;
         }
         
-        // Display primary result immediately
         writeln("[App] Displaying primary result");
         homepage.displayResults(query, lastSearchCompound, null);
-        
-        // Start asynchronous similarity search
-        import core.thread : Thread, msecs;
-        
-        int primaryCid = lastSearchCompound.cid;
         
         // Spawn thread for similarity search
         auto similarSearchThread = new Thread({
             try
             {
-                auto similarCompounds = similaritySearch(primaryCid, 85, 10);
+                auto similarCompounds = similaritySearch(lastSearchCompound.cid, 85, 10);
                 
                 // Filter out duplicates and limit results
-                Compound[] filteredCompounds;
+                Compound[] filtered;
                 foreach (compound; similarCompounds)
                 {
-                    if (compound.cid != primaryCid)
-                        filteredCompounds ~= compound;
+                    if (compound.cid != lastSearchCompound.cid)
+                        filtered ~= compound;
                 }
                 
-                if (filteredCompounds.length > 4)
-                    filteredCompounds = filteredCompounds[0..4];
+                if (filtered.length > 4)
+                    filtered = filtered[0..4];
                 
                 // Small delay to ensure UI is ready
                 Thread.sleep(100.msecs);
                 
                 // Update UI
-                writeln("[App] Adding ", filteredCompounds.length, " similar compounds");
-                homepage.addSimilarResults(filteredCompounds);
+                writeln("[App] Adding ", filtered.length, " similar compounds");
+                homepage.addSimilarResults(filtered);
             }
             catch (Exception e)
             {
@@ -188,12 +182,6 @@ class WikiaWindow : gtk.application_window.ApplicationWindow
             }
         });
         similarSearchThread.start();
-    }
-
-    private void onResultSelected(int index)
-    {
-        writeln("[App] onResultSelected called with index: ", index);
-        // This method is kept for compatibility but not used
     }
 
     private void onCompoundSelected(int index, Compound compound)
@@ -205,36 +193,28 @@ class WikiaWindow : gtk.application_window.ApplicationWindow
             return;
         }
 
-        titleLabel.label = "Wikia - "~compound.name;
-        
+        lastSearchCompound = compound;
         Conformer3D conformer;
         try
-        {
             conformer = getConformer3D!"cid"(compound.cid)[0];
-        }
         catch (Exception e)
-        {
             writeln("[App] Failed to get conformer: ", e.msg);
-        }
         
         updateArticleView(compound, conformer, compound.name);
         showArticle();
         articleView.getInfobox().showLoading();
 
-        import core.thread : Thread;
         auto dosageThread = new Thread({
             try
             {
                 writeln("[App] Fetching dosage for CID ", compound.cid);
                 auto result = getDosage(compound);
                 writeln("[App] Dosage result: ", result.dosages.length,
-                    " routes, fromSimilar=", result.fromSimilar);
+                    " routes, source=", result.source ? result.source.name : "primary");
                 articleView.getInfobox().setDosage(result);
             }
             catch (Exception e)
-            {
                 writeln("[App] Dosage fetch failed: ", e.msg);
-            }
         });
         dosageThread.start();
 
@@ -287,10 +267,8 @@ class WikiaApp : gtk.application.Application
             cssProvider.loadFromString(css);
         }
         else
-        {
-            import std.stdio : writeln;
             writeln("Warning: CSS file not found at "~cssPath);
-        }
+
         Display display = Display.getDefault();
         StyleContext.addProviderForDisplay(display, cssProvider, STYLE_PROVIDER_PRIORITY_APPLICATION);
     }

@@ -1,136 +1,118 @@
-// module wikia.entrez.pmc;
+module wikia.entrez.pmc;
 
-// import wikia.entrez.eutils;
-// import wikia.page;
-// import std.json : JSONValue, JSONType;
-// import std.algorithm : map, filter;
-// import std.array : join, array;
-// import std.regex;
-// import std.string : indexOf, strip, replace;
+import std.json : JSONValue;
+import std.algorithm : map;
+import std.array : array;
+import std.regex : matchAll, matchFirst, ctRegex, regex;
+import std.string : strip, replace;
 
-// class PMC
-// {
-//     private static string decodeXml(string str)
-//     {
-//         str = replace(str, "&lt;", "<");
-//         str = replace(str, "&gt;", ">");
-//         str = replace(str, "&quot;", "\"");
-//         str = replace(str, "&apos;", "'");
-//         str = replace(str, "&#39;", "'");
-//         str = replace(str, "&amp;", "&");
-//         return str.strip();
-//     }
+import wikia.entrez.eutils;
+import wikia.page;
 
-//     private static Page[] parseArticles(string xml)
-//     {
-//         Page[] ret;
+private:
 
-//         if (xml.length == 0)
-//             return ret;
+string decodeXml(string text)
+{
+    if (text is null)
+        return null;
+    return text
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&amp;", "&")
+        .replace("&quot;", "\"")
+        .replace("&apos;", "'")
+        .replace("&#39;", "'")
+        .strip;
+}
 
-//         RegexMatch!string matches = matchAll(
-//             xml,
-//             ctRegex!(`<(?:article|pmc-articleset)>.*?</(?:article|pmc-articleset)>`)
-//         );
+string xmlTag(string xml, string re)
+{
+    auto m = matchFirst(xml, regex(re));
+    return m.empty ? null : decodeXml(m[1]);
+}
 
-//         foreach (Captures!string match; matches)
-//         {
-//             string articleXml = match.hit;
+Page[] parseArticles(string xml)
+{
+    if (xml is null || xml.length == 0)
+        return [];
 
-//             Captures!string pmcMatch = matchFirst(
-//                 articleXml,
-//                 ctRegex!`<article-id[^>]*pub-id-type="pmc"[^>]*>(\d+)</article-id>`
-//             );
-//             pmcMatch = pmcMatch.empty ? matchFirst(articleXml, ctRegex!`pmc-(\d+)`) : pmcMatch;
-//             if (pmcMatch.empty)
-//                 continue;
+    Page[] ret;
+    foreach (m; matchAll(xml, ctRegex!(`<article[\s>][\s\S]*?</article>`)))
+    {
+        string ax = m.hit;
 
-//             string pmcId = pmcMatch.captures[0];
-//             Page page = new Page(pmcId, "pmc");
-//             page.metadata.fields["pmcId"] = pmcId;
+        string pmcId = xmlTag(ax, `<article-id[^>]*pub-id-type="pmc"[^>]*>(\d+)</article-id>`);
+        if (pmcId is null)
+            continue;
 
-//             Captures!string pmidMatch = matchFirst(
-//                 articleXml,
-//                 ctRegex!`<article-id[^>]*pub-id-type="pmid"[^>]*>(\d+)</article-id>`
-//             );
-//             if (!pmidMatch.empty)
-//                 page.metadata.fields["pmid"] = pmidMatch.captures[0];
+        string title = xmlTag(ax, `<article-title[^>]*>([\s\S]*?)</article-title>`);
+        string doi = xmlTag(ax, `<article-id[^>]*pub-id-type="doi"[^>]*>([\s\S]*?)</article-id>`);
+        string pmid = xmlTag(ax, `<article-id[^>]*pub-id-type="pmid"[^>]*>(\d+)</article-id>`);
 
-//             Captures!string titleMatch = matchFirst(
-//                 articleXml,
-//                 ctRegex!`<article-title[^>]*>(.*?)</article-title>`
-//             );
-//             if (!titleMatch.empty)
-//                 page.title = decodeXml(titleMatch.captures[0]);
+        Page page = new Page();
+        page.title = title !is null ? title : pmcId;
+        page.source = "pmc";
+        page.url = "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC"~pmcId~"/";
 
-//             RegexMatch!string authorMatch = matchAll(
-//                 articleXml,
-//                 ctRegex!`<contrib[^>]*contrib-type="author"[^>]*>.*?<surname[^>]*>(.*?)</surname>.*?<given-names[^>]*>(.*?)</given-names>.*?</contrib>`
-//             );
-//             foreach (Captures!string author; authorMatch)
-//             {
-//                 if (author.captures.length >= 2)
-//                 {
-//                     string lastName = decodeXml(author.captures[0]);
-//                     string foreName = decodeXml(author.captures[1]);
-//                     page.authors ~= foreName~" "~lastName;
-//                 }
-//             }
+        // Abstract as section
+        string abs = xmlTag(ax, `<abstract[^>]*>([\s\S]*?)</abstract>`);
+        if (abs !is null)
+            page._sections ~= Section("Abstract", abs, 1);
 
-//             Captures!string doiMatch = matchFirst(
-//                 articleXml,
-//                 ctRegex!`<article-id[^>]*pub-id-type="doi"[^>]*>(.*?)</article-id>`
-//             );
-//             if (!doiMatch.empty)
-//                 page.metadata.fields["doi"] = decodeXml(doiMatch.captures[0]);
+        // Body as section
+        string body_ = xmlTag(ax, `<body[^>]*>([\s\S]*?)</body>`);
+        if (body_ !is null)
+            page._sections ~= Section("Body", body_, 1);
 
-//             Section[] sections;
-//             Captures!string abstractMatch = matchFirst(
-//                 articleXml,
-//                 ctRegex!`<abstract[^>]*>(.*?)</abstract>`
-//             );
-//             if (!abstractMatch.empty)
-//                 sections ~= Section("Abstract", decodeXml(abstractMatch.captures[0]), 1);
+        // Store metadata in raw for later extraction
+        page._raw = "PMC="~pmcId
+           ~(pmid !is null ? "\nPMID="~pmid : "")
+           ~(doi !is null ? "\nDOI="~doi : "");
 
-//             RegexMatch!string bodyMatch = matchAll(
-//                 articleXml,
-//                 ctRegex!`<body[^>]*>(.*?)</body>`
-//             );
-//             if (!bodyMatch.captures.empty)
-//                 sections ~= Section("Body", decodeXml(bodyMatch.front.captures[0]), 1);
+        ret ~= page;
+    }
+    return ret;
+}
 
-//             page.sections = sections;
+public:
 
-//             ret ~= page;
-//         }
+Page[] getPages(string DB)(string term, int limit = 10, string apiKey = null)
+    if (DB == "pmc")
+{
+    JSONValue json = esearch!"pmc"(term, limit, 0, apiKey);
 
-//         return ret;
-//     }
+    if ("esearchresult" !in json || "idlist" !in json["esearchresult"])
+        return [];
 
-//     static Page[] search(string term, int limit = 10, string apiKey = null)
-//     {
-//         JSONValue json = Entrez.esearch!"pmc"(term, limit, 0, false, TimeFrame.init, apiKey);
-//         if (json.type == JSONType.null_ || "esearchresult" !in json)
-//             return [];
+    string[] pmcIds = json["esearchresult"]["idlist"].array.map!(x => x.str).array;
+    if (pmcIds.length == 0)
+        return [];
 
-//         string[] pmcIds = json["esearchresult"]["idlist"].array.map!(x => x.str).array;
-//         if (pmcIds.length == 0)
-//             return [];
+    string xml = efetch!"pmc"(pmcIds, "full", apiKey);
+    return parseArticles(xml);
+}
 
-//         string xml = Entrez.efetch!"pmc"(pmcIds, "full", apiKey);
-//         return parseArticles(xml);
-//     }
+Page[] getPagesByID(string DB)(string[] ids...) if (DB == "pmc")
+{
+    if (ids.length == 0)
+        return [];
 
-//     static string[] fulltext(Page[] pages, string apiKey = null)
-//     {
-//         string[] pmcIds = pages.map!(x => x.metadata.get("pmcId")).filter!(x => x !is null).array;
-//         if (pmcIds.length == 0)
-//             return [];
+    string xml = efetch!"pmc"(ids, "full");
+    return parseArticles(xml);
+}
 
-//         string xml = Entrez.efetch!"pmc"(pmcIds, "full", apiKey);
-//         return parseArticles(xml).map!(x => x.fulltext()).array;
-//     }
+string getDOI(Page page)
+{
+    if (page is null || page._raw is null)
+        return null;
 
-//     static JSONValue esearch(string term, int limit = 10, int retstart = 0, string apiKey = null)
-//         => Entrez.esearch!"pmc"(term, limit, retstart, false, TimeFrame.init, apiKey);
-// }
+    import std.string : indexOf;
+    string raw = page._raw;
+    auto idx = raw.indexOf("DOI=");
+    if (idx < 0)
+        return null;
+
+    string rest = raw[idx + 4 .. $];
+    auto nl = rest.indexOf("\n");
+    return nl >= 0 ? rest[0 .. nl] : rest;
+}

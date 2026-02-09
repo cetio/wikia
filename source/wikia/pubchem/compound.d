@@ -14,6 +14,7 @@ struct Properties
     double mass;
     int charge;
     double tpsa;
+    double xlogp;
 }
 
 class Compound

@@ -322,3 +322,8 @@
     font-size: 0.9em;
     color: #202122;
 }
+
+.collapsible-hover {
+    background: rgba(220, 220, 220, 0.90);
+}
+
