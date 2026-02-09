@@ -218,16 +218,9 @@
     background: #ffffff;
 }
 
-.article-content {
+.article {
     background: #ffffff;
     padding: 20px 24px;
-}
-
-.article-placeholder {
-    color: #72777d;
-    font-style: italic;
-    font-size: 1.05em;
-    padding-top: 8px;
 }
 
 .infobox {
@@ -323,3 +316,124 @@
     background: rgba(220, 220, 220, 0.90);
 }
 
+/* Article Body */
+.article-content {
+    padding: 0;
+}
+
+/* Article Nav Bar */
+.article-nav {
+    background: #f8f9fa;
+    border-bottom: 1px solid #a2a9b1;
+    padding: 12px 20px;
+}
+
+.article-nav-title {
+    font-size: 1.6em;
+    font-weight: 700;
+    color: #202122;
+}
+
+/* Expander */
+.expander {
+    border-bottom: 1px solid #eaecf0;
+}
+
+.expander-header {
+    background: #f8f9fa;
+    padding: 10px 20px;
+    font-weight: 600;
+    font-size: 0.95em;
+    color: #202122;
+    border-bottom: 1px solid #eaecf0;
+}
+
+.expander-header-hover {
+    background: #eaecf0;
+}
+
+.expander-content {
+    padding: 12px 20px;
+    background: #ffffff;
+}
+
+/* Nav Home Button */
+.nav-home-button {
+    background: transparent;
+    border: 1px solid #a2a9b1;
+    border-radius: 4px;
+    padding: 4px 8px;
+    color: #202122;
+}
+
+.nav-home-button:hover {
+    background: #eaecf0;
+}
+
+/* Expander Rows */
+.expander-row {
+    padding: 4px 0;
+    border-bottom: 1px solid #eaecf0;
+}
+
+.expander-row-label {
+    font-weight: 600;
+    font-size: 0.9em;
+    color: #202122;
+    min-width: 80px;
+}
+
+.expander-row-value {
+    font-size: 0.9em;
+    color: #54595d;
+}
+
+.expander-detail {
+    font-size: 0.9em;
+    color: #54595d;
+    font-family: monospace;
+}
+
+/* Report Rows */
+.report-row {
+    padding: 8px 0;
+    border-bottom: 1px solid #eaecf0;
+}
+
+.report-title {
+    font-size: 0.95em;
+    font-weight: 500;
+    color: #3366cc;
+    padding: 4px 0;
+}
+
+.report-title:hover {
+    text-decoration: underline;
+}
+
+.report-content {
+    font-size: 0.85em;
+    color: #54595d;
+    padding: 8px 0 4px 12px;
+    border-left: 3px solid #eaecf0;
+    margin-top: 4px;
+}
+
+.report-body {
+    padding: 16px 20px;
+}
+
+.report-body-text {
+    font-size: 0.9em;
+    color: #202122;
+    line-height: 1.6;
+    padding: 8px 0;
+}
+
+.report-section-heading {
+    font-size: 1.1em;
+    font-weight: 600;
+    color: #202122;
+    padding: 16px 0 8px 0;
+    border-bottom: 1px solid #eaecf0;
+}

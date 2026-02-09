@@ -27,8 +27,8 @@ package:
     bool motionControl;
 
     string tooltip;
-    double mouseX;
-    double mouseY;
+    double mouseX = 0;
+    double mouseY = 0;
 
     void delegate() onClick;
 
@@ -170,9 +170,12 @@ private:
 
     void onDraw(DrawingArea, Context ctx, int width, int height)
     {
-        // TODO: Should run a hit test to automatically highlight hovered atom/bond and have depth effect of highlighting nearby atom/bonds in 3D
         drawBackground(ctx);
         drawGrid(this, ctx);
+
+        if (compound is null)
+            return;
+
         drawBackgroundText(this, ctx);
 
         if (compound.conformer3D is null || !compound.conformer3D.isValid())

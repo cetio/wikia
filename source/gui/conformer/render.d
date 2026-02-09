@@ -223,6 +223,8 @@ void drawMolecule(MoleculeView view, Context ctx)
 void drawInfoText(MoleculeView view, Context ctx)
 {
     Conformer3D conformer = view.compound.conformer3D;
+    if (conformer is null || !conformer.isValid())
+        return;
     
     ctx.setSourceRgb(1, 1, 1);
     ctx.selectFontFace("Sans", FontSlant.Normal, FontWeight.Normal);

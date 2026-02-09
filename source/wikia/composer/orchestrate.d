@@ -2,7 +2,7 @@ module wikia.composer.orchestrate;
 
 import std.net.curl : HTTP;
 import std.uri : encode;
-import std.array : join;
+import std.array : join, replace;
 import std.datetime : SysTime, Clock, Duration;
 import core.thread : Thread;
 import core.time : dur;
@@ -48,7 +48,7 @@ struct Orchestrator
         {
             string[] pairs;
             foreach (k, v; queryParams)
-                pairs ~= encode(k)~"="~encode(v);
+                pairs ~= encode(k)~"="~encode(v).replace("+", "%2B");
             url ~= "?"~pairs.join("&");
         }
         return url;

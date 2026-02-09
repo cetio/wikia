@@ -141,8 +141,7 @@ public:
         }
 
         lastSearchCompound = compound;
-        article.infobox.update(compound);
-        article.infobox.showLoading();
+        article.fromCompound(compound);
         showArticle();
 
         Thread dosageThread = new Thread({
@@ -172,7 +171,7 @@ public:
         titleLabel.label = "Wikia";
         stack.visibleChildName = "homepage";
         lastSearchCompound = null;
-        article.infobox.reset();
+        article.clearArticle();
         homepage.clearResults();
     }
 

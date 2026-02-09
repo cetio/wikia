@@ -111,7 +111,7 @@ string getDOI(Page page)
     if (idx < 0)
         return null;
 
-    string rest = raw[idx + 4 .. $];
+    string rest = raw[idx + 4..$];
     auto nl = rest.indexOf("\n");
-    return nl >= 0 ? rest[0 .. nl] : rest;
+    return nl >= 0 ? rest[0..nl] : rest;
 }
