@@ -93,51 +93,39 @@ class Infobox : Overlay
         dosageSection.visible = false;
         content.append(dosageSection);
 
-        Background bg = new Background(
-            6,      // maxSplotches
-            120,    // msPerFrame
-            10.0,   // spawnMargin
-            25.0,   // minRadius
-            65.0,   // maxRadius
-            0.55,   // minAlpha
-            0.85,   // maxAlpha
-            "infobox-background", // cssClass
-            true    // paintBase
-        );
-        bg.hexpand = true;
-        bg.vexpand = true;
-        setChild(bg);
+        // Background bg = new Background(
+        //     6,      // maxSplotches
+        //     120,    // msPerFrame
+        //     10.0,   // spawnMargin
+        //     25.0,   // minRadius
+        //     65.0,   // maxRadius
+        //     0.55,   // minAlpha
+        //     0.85,   // maxAlpha
+        //     "infobox-background", // cssClass
+        //     true    // paintBase
+        // );
+        // bg.hexpand = true;
+        // bg.vexpand = true;
+        // setChild(bg);
 
         addOverlay(content);
         setMeasureOverlay(content, true);
         setClipOverlay(content, true);
     }
 
-    @property MoleculeViewer getViewer()
+    void update(Compound compound)
     {
-        return moleculeViewer;
-    }
-
-    void setCompound(Compound compound)
-    {
-        currentCompound = compound;
-    }
-
-    void setConformer(Conformer3D conformer)
-    {
-        moleculeViewer.setConformer(conformer);
-    }
-
-    void update(Compound compound, Conformer3D conformer, string name)
-    {
-        writeln("[Infobox] update called, name: ", name);
-        if (conformer is null || compound is null)
+        writeln("[Infobox] update called");
+        if (compound is null)
         {
-            writeln("[Infobox] Conformer or compound is null, returning");
+            writeln("[Infobox] Compound is null, returning");
             return;
         }
 
-        compoundNameLabel.label = name;
+        currentCompound = compound;
+        moleculeViewer.setConformer(compound.conformer3D);
+
+        compoundNameLabel.label = compound.name;
         cidLabel.label = compound.cid > 0 ? compound.cid.to!string : "--";
         formulaLabel.label = compound.properties.formula.length > 0
             ? compound.properties.formula : "--";
@@ -153,6 +141,25 @@ class Infobox : Overlay
             ? compound.properties.xlogp.to!string : "--";
         smilesLabel.label = compound.smiles.length > 0
             ? compound.smiles : "--";
+    }
+
+    void reset()
+    {
+        compoundNameLabel.label = "Select";
+        cidLabel.label = "--";
+        formulaLabel.label = "--";
+        weightLabel.label = "--";
+        massLabel.label = "--";
+        chargeLabel.label = "--";
+        tpsaLabel.label = "--";
+        xlogpLabel.label = "--";
+        smilesLabel.label = "--";
+
+        currentCompound = null;
+        moleculeViewer.setConformer(null);
+        hideLoading();
+        clearBox(dosageSection);
+        dosageSection.visible = false;
     }
 
     void showLoading()
@@ -219,25 +226,6 @@ class Infobox : Overlay
         }
 
         dosageSection.visible = true;
-    }
-
-    void reset()
-    {
-        compoundNameLabel.label = "Select";
-        cidLabel.label = "--";
-        formulaLabel.label = "--";
-        weightLabel.label = "--";
-        massLabel.label = "--";
-        chargeLabel.label = "--";
-        tpsaLabel.label = "--";
-        xlogpLabel.label = "--";
-        smilesLabel.label = "--";
-
-        currentCompound = null;
-        moleculeViewer.setConformer(null);
-        hideLoading();
-        clearBox(dosageSection);
-        dosageSection.visible = false;
     }
 
     private void buildChemicalSection()

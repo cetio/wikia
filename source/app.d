@@ -70,7 +70,6 @@ class WikiaWindow : gtk.application_window.ApplicationWindow
         articleView = new ArticleView();
         articleView.onGoHome = &showHome;
         articleView.getInfobox().onViewerClick = &onMoleculeViewerClick;
-        articleView.getInfobox().setCompound(null);
         contentStack.addNamed(articleView, "article");
 
         contentStack.visibleChildName = "homepage";
@@ -149,14 +148,14 @@ class WikiaWindow : gtk.application_window.ApplicationWindow
             return;
         }
         
-        writeln("[App] Displaying primary result");
+        writeln("[App] Displaying primary dosage");
         homepage.displayResults(query, lastSearchCompound, null);
         
         // Spawn thread for similarity search
-        auto similarSearchThread = new Thread({
+        Thread similarSearchThread = new Thread({
             try
             {
-                auto similarCompounds = similaritySearch(lastSearchCompound.cid, 85, 10);
+                Compound[] similarCompounds = similaritySearch(lastSearchCompound.cid, 85, 10);
                 
                 // Filter out duplicates and limit results
                 Compound[] filtered;
@@ -177,9 +176,7 @@ class WikiaWindow : gtk.application_window.ApplicationWindow
                 homepage.addSimilarResults(filtered);
             }
             catch (Exception e)
-            {
                 writeln("[App] Similarity search failed: ", e.msg);
-            }
         });
         similarSearchThread.start();
     }
@@ -194,24 +191,18 @@ class WikiaWindow : gtk.application_window.ApplicationWindow
         }
 
         lastSearchCompound = compound;
-        Conformer3D conformer;
-        try
-            conformer = getConformer3D!"cid"(compound.cid)[0];
-        catch (Exception e)
-            writeln("[App] Failed to get conformer: ", e.msg);
-        
-        updateArticleView(compound, conformer, compound.name);
+        articleView.getInfobox().update(compound);
         showArticle();
         articleView.getInfobox().showLoading();
 
-        auto dosageThread = new Thread({
+        Thread dosageThread = new Thread({
             try
             {
                 writeln("[App] Fetching dosage for CID ", compound.cid);
-                auto result = getDosage(compound);
-                writeln("[App] Dosage result: ", result.dosages.length,
-                    " routes, source=", result.source ? result.source.name : "primary");
-                articleView.getInfobox().setDosage(result);
+                DosageResult dosage = getDosage(compound);
+                writeln("[App] Dosage dosage: ", dosage.dosages.length,
+                    " routes, source=", dosage.source ? dosage.source.name : "primary");
+                articleView.getInfobox().setDosage(dosage);
             }
             catch (Exception e)
                 writeln("[App] Dosage fetch failed: ", e.msg);
@@ -219,15 +210,6 @@ class WikiaWindow : gtk.application_window.ApplicationWindow
         dosageThread.start();
 
         writeln("[App] onCompoundSelected completed");
-    }
-
-    private void updateArticleView(Compound compound, Conformer3D conformer, string name)
-    {
-        writeln("[App] updateArticleView called");
-        articleView.getInfobox().setCompound(compound);
-        articleView.getInfobox().setConformer(conformer);
-        articleView.getInfobox().update(compound, conformer, name);
-        writeln("[App] updateArticleView completed");
     }
 
     private void showArticle()
@@ -240,8 +222,6 @@ class WikiaWindow : gtk.application_window.ApplicationWindow
         titleLabel.label = "Wikia";
         contentStack.visibleChildName = "homepage";
         lastSearchCompound = null;
-        articleView.getInfobox().setConformer(null);
-        articleView.getInfobox().setCompound(null);
         articleView.getInfobox().reset();
         homepage.clearResults();
     }

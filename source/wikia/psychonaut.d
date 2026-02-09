@@ -74,6 +74,7 @@ Page[] getPages(string DB)(string term, int limit = 10)
         ret ~= new Page(title, "psychonaut",
             "https://psychonautwiki.org/wiki/"~title,
             toDelegate(&fetchContent));
+            
         if (ret.length >= limit)
             break;
     }
@@ -100,7 +101,7 @@ Page[] getPagesByTitle(string DB)(string[] titles...)
     {
         if ("missing" in pg)
             continue;
-            
+
         string title = pg["title"].str;
         ret ~= new Page(title, "psychonaut",
             "https://psychonautwiki.org/wiki/"~title,
@@ -128,6 +129,7 @@ Page[] getReports(string substance, int limit = 20)
         ret ~= new Page(title, "psychonaut",
             "https://psychonautwiki.org/wiki/"~title,
             toDelegate(&fetchContent));
+
         if (ret.length >= limit)
             break;
     }
