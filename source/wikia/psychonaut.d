@@ -97,12 +97,12 @@ Page[] getPagesByTitle(string DB)(string[] titles...)
         return [];
 
     Page[] ret;
-    foreach (pg; json["query"]["pages"].array)
+    foreach (page; json["query"]["pages"].array)
     {
-        if ("missing" in pg)
+        if ("missing" in page)
             continue;
 
-        string title = pg["title"].str;
+        string title = page["title"].str;
         ret ~= new Page(title, "psychonaut",
             "https://psychonautwiki.org/wiki/"~title,
             toDelegate(&fetchContent));

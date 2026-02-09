@@ -70,10 +70,10 @@ Compound[] internalGetID(string TYPE)(string str)
             if (json.isNull || "InformationList" !in json || "Information" !in json["InformationList"])
                 throw new Exception("ID list is invalid "~json.toString());
 
-            foreach (idList; json["InformationList"]["Information"].array)
+            foreach (ids; json["InformationList"]["Information"].array)
             {
-                Compound compound = Compound.getOrCreate(idList["CID"].get!int);
-                foreach (sid; idList["SID"].array)
+                Compound compound = Compound.getOrCreate(ids["CID"].get!int);
+                foreach (sid; ids["SID"].array)
                     compound.sids ~= sid.get!int;
                 ret ~= compound;
             }
@@ -125,7 +125,7 @@ string[][] internalGetSynonyms(string TYPE)(string str)
                 string[] synonyms;
                 if ("Synonym" in info)
                 {
-                    foreach (JSONValue syn; info["Synonym"].array)
+                    foreach (syn; info["Synonym"].array)
                         synonyms ~= syn.str;
                 }
                 ret ~= synonyms;
@@ -173,14 +173,14 @@ void parseAtoms(Conformer3D conformer, JSONValue json)
 
     if ("aid" in atoms)
     {
-        foreach (JSONValue a; atoms["aid"].array)
-            aids ~= a.get!int;
+        foreach (aid; atoms["aid"].array)
+            aids ~= aid.get!int;
     }
 
     if ("element" in atoms)
     {
-        foreach (JSONValue e; atoms["element"].array)
-            elements ~= e.get!int;
+        foreach (elem; atoms["element"].array)
+            elements ~= elem.get!int;
     }
 
     size_t atomCount = aids.length > elements.length ? elements.length : aids.length;
@@ -203,28 +203,30 @@ void parseBonds(Conformer3D conformer, JSONValue json)
         return;
 
     JSONValue bonds = json["bonds"];
-    int[] aid1s, aid2s, orders;
+    int[] aid1s;
+    int[] aid2s;
+    int[] orders;
 
     if ("aid1" in bonds)
     {
-        foreach (JSONValue a; bonds["aid1"].array)
-            aid1s ~= a.get!int;
+        foreach (aid1; bonds["aid1"].array)
+            aid1s ~= aid1.get!int;
     }
 
     if ("aid2" in bonds)
     {
-        foreach (JSONValue a; bonds["aid2"].array)
-            aid2s ~= a.get!int;
+        foreach (aid2; bonds["aid2"].array)
+            aid2s ~= aid2.get!int;
     }
 
     if ("order" in bonds)
     {
-        foreach (JSONValue o; bonds["order"].array)
-            orders ~= o.get!int;
+        foreach (order; bonds["order"].array)
+            orders ~= order.get!int;
     }
 
     size_t bondCount = aid1s.length > aid2s.length ? aid2s.length : aid1s.length;
-    foreach (size_t i; 0..bondCount)
+    foreach (i; 0..bondCount)
         conformer.bonds ~= Bond3D(aid1s[i], aid2s[i], i < orders.length ? orders[i] : 1);
 }
 
@@ -243,24 +245,23 @@ void parseCoords(Conformer3D conformer, JSONValue json)
     double[] xs, ys, zs;
 
     if ("x" in conf)
-        foreach (JSONValue v; conf["x"].array)
-            xs ~= v.type == JSONType.float_ ? v.get!double : v.get!long.to!double;
+        foreach (x; conf["x"].array)
+            xs ~= x.type == JSONType.float_ ? x.get!double : x.get!long.to!double;
 
     if ("y" in conf)
-        foreach (JSONValue v; conf["y"].array)
-            ys ~= v.type == JSONType.float_ ? v.get!double : v.get!long.to!double;
+        foreach (y; conf["y"].array)
+            ys ~= y.type == JSONType.float_ ? y.get!double : y.get!long.to!double;
 
     if ("z" in conf)
-        foreach (JSONValue v; conf["z"].array)
-            zs ~= v.type == JSONType.float_ ? v.get!double : v.get!long.to!double;
+        foreach (z; conf["z"].array)
+            zs ~= z.type == JSONType.float_ ? z.get!double : z.get!long.to!double;
 
     if ("aid" in coordSet)
     {
         JSONValue[] coordAids = coordSet["aid"].array;
-        foreach (size_t i, JSONValue val; coordAids)
+        foreach (i, aid; coordAids)
         {
-            int aid = val.get!int;
-            int idx = conformer.indexOf(aid);
+            int idx = conformer.indexOf(aid.get!int);
             if (idx >= 0 && i < xs.length && i < ys.length && i < zs.length)
             {
                 conformer.atoms[idx].x = xs[i];
@@ -272,7 +273,7 @@ void parseCoords(Conformer3D conformer, JSONValue json)
 
     if ("data" in conf)
     {
-        foreach (JSONValue point; conf["data"].array)
+        foreach (point; conf["data"].array)
         {
             if ("urn" !in point || "value" !in point)
                 continue;
@@ -293,7 +294,7 @@ void parseCoords(Conformer3D conformer, JSONValue json)
                 conformer.selfOverlap = val["fval"].get!double;
             else if (label == "Shape" && name == "Multipoles" && "fvec" in val)
             {
-                foreach (JSONValue m; val["fvec"].array)
+                foreach (m; val["fvec"].array)
                 {
                     double mval = m.type == JSONType.float_ ? m.get!double : m.get!long.to!double;
                     conformer.multipoles ~= mval;

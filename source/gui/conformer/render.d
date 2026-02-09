@@ -71,7 +71,7 @@ void drawGrid(Context cr, int width, int height)
 
 void drawBackgroundText(Context cr, string name, int width, int height)
 {
-    if (name is null)
+    if (name == null)
         return;
 
     cr.selectFontFace("Sans", FontSlant.Normal, FontWeight.Bold);
@@ -163,8 +163,7 @@ void drawInfoText(
     cr.selectFontFace("Sans", FontSlant.Normal, FontWeight.Normal);
     cr.setFontSize(11);
     cr.moveTo(10, height - 10);
-    string info = "Atoms: "~atoms.to!string~"  Bonds: "~bonds.to!string;
-    cr.showText(info);
+    cr.showText("Atoms: "~atoms.to!string~"  Bonds: "~bonds.to!string);
 }
 
 void drawTooltip(
@@ -176,7 +175,7 @@ void drawTooltip(
     int height
 )
 {
-    if (text is null)
+    if (text == null)
         return;
 
     cr.selectFontFace("Sans", FontSlant.Normal, FontWeight.Normal);

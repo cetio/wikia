@@ -61,7 +61,7 @@ HitResult hitTest(
     double closestBondDist = double.max;
     int hoveredBondIdx = -1;
 
-    foreach (size_t i, bond; conformer.bonds)
+    foreach (i, bond; conformer.bonds)
     {
         int idx1 = conformer.indexOf(bond.aid1);
         int idx2 = conformer.indexOf(bond.aid2);

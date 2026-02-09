@@ -94,12 +94,12 @@ Page[] getPagesByTitle(string DB)(string[] titles...)
         return [];
 
     Page[] ret;
-    foreach (pg; json["query"]["pages"].array)
+    foreach (page; json["query"]["pages"].array)
     {
-        if ("missing" in pg)
+        if ("missing" in page)
             continue;
             
-        string title = pg["title"].str;
+        string title = page["title"].str;
         ret ~= new Page(title, "wikipedia",
             "https://en.wikipedia.org/wiki/"~title,
             toDelegate(&fetchContent));
@@ -111,33 +111,33 @@ string[] extractCIDs(Page page)
 {
     string[] cids;
     enum pubChemRe = ctRegex!`PubChem\s*=\s*(\d+)`;
-    foreach (match; matchAll(page.raw, pubChemRe))
+    foreach (m; matchAll(page.raw, pubChemRe))
     {
-        string cid = strip(match[1]);
+        string cid = strip(m[1]);
         if (cid.length && !cids.canFind(cid))
             cids ~= cid;
     }
 
     enum pubChemCidRe = ctRegex!`PubChemCID\s*=\s*(\d+)`;
-    foreach (match; matchAll(page.raw, pubChemCidRe))
+    foreach (m; matchAll(page.raw, pubChemCidRe))
     {
-        string cid = strip(match[1]);
+        string cid = strip(m[1]);
         if (cid.length && !cids.canFind(cid))
             cids ~= cid;
     }
 
     enum pubChemTemplateRe = ctRegex!`\{\{\s*PubChem\s*\|\s*(\d+)\s*\}\}`;
-    foreach (match; matchAll(page.raw, pubChemTemplateRe))
+    foreach (m; matchAll(page.raw, pubChemTemplateRe))
     {
-        string cid = strip(match[1]);
+        string cid = strip(m[1]);
         if (cid.length && !cids.canFind(cid))
             cids ~= cid;
     }
 
     enum pubChemUrlRe = ctRegex!`https?://(?:www\.)?pubchem\.ncbi\.nlm\.nih\.gov/compound/(\d+)`;
-    foreach (match; matchAll(page.raw, pubChemUrlRe))
+    foreach (m; matchAll(page.raw, pubChemUrlRe))
     {
-        string cid = strip(match[1]);
+        string cid = strip(m[1]);
         if (cid.length && !cids.canFind(cid))
             cids ~= cid;
     }

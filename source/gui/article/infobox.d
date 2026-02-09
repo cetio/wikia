@@ -155,7 +155,7 @@ public:
 
     void reset()
     {
-        titleLabel.label = "Select";
+        titleLabel.label = "Unknown";
         cidLabel.label = "--";
         formulaLabel.label = "--";
         weightLabel.label = "--";
@@ -184,55 +184,57 @@ public:
         loadingDots.visible = false;
     }
 
-    void setDosage(DosageResult result)
+    void setDosage(DosageResult dosage)
     {
         writeln("[Infobox] setDosage called, ",
-            result.dosages.length, " routes, source=",
-            result.source ? result.source.name : "primary");
+            dosage.dosages.length, " routes, source=",
+            dosage.source ? dosage.source.name : "primary");
 
+        // TODO: Streamline loading animation and privacy attributes.
         hideLoading();
         clearBox(secDosage);
-
-        if (result.dosages.length == 0)
+        if (dosage.dosages.length == 0)
         {
             secDosage.visible = false;
             return;
         }
 
-        Box hdrBox = new Box(Orientation.Horizontal, 4);
-        hdrBox.addCssClass("infobox-section-header");
-        hdrBox.halign = Align.Fill;
+        Box secHeader = new Box(Orientation.Horizontal, 4);
+        secHeader.addCssClass("infobox-section-header");
+        secHeader.halign = Align.Fill;
 
-        Label hdr = new Label("Dosage");
-        hdr.halign = Align.Start;
-        hdr.hexpand = true;
-        hdr.xalign = 0;
-        hdrBox.append(hdr);
+        Label headerLabel = new Label("Dosage");
+        headerLabel.halign = Align.Start;
+        headerLabel.hexpand = true;
+        headerLabel.xalign = 0;
+        secHeader.append(headerLabel);
 
-        if (result.source !is null)
+        if (dosage.source !is null)
         {
-            Label sourceLabel = new Label(result.source.name);
+            Label sourceLabel = new Label(dosage.source.name);
             sourceLabel.addCssClass("dosage-similar-warning");
             sourceLabel.halign = Align.End;
             sourceLabel.tooltipText = "Sourced from a similar compound";
-            hdrBox.append(sourceLabel);
+            secHeader.append(sourceLabel);
         }
+        secDosage.append(secHeader);
 
-        secDosage.append(hdrBox);
-
-        foreach (d; result.dosages)
+        foreach (d; dosage.dosages)
         {
-            Box routeContent = new Box(Orientation.Vertical, 0);
-            routeContent.hexpand = true;
-            routeContent.halign = Align.Fill;
-            appendRow(routeContent, "Bioavail.", d.bioavailability);
-            appendRow(routeContent, "Threshold", d.threshold);
-            appendRow(routeContent, "Light", d.light);
-            appendRow(routeContent, "Common", d.common);
-            appendRow(routeContent, "Strong", d.strong);
-            appendRow(routeContent, "Heavy", d.heavy);
-            secDosage.append(buildCollapsibleSubheading(d.route, routeContent));
-            secDosage.append(routeContent);
+            Box route = new Box(Orientation.Vertical, 0);
+            route.hexpand = true;
+            route.halign = Align.Fill;
+            appendRow(route, "Bioavail.", d.bioavailability);
+            appendRow(route, "Threshold", d.threshold);
+            appendRow(route, "Light", d.light);
+            appendRow(route, "Common", d.common);
+            appendRow(route, "Strong", d.strong);
+            appendRow(route, "Heavy", d.heavy);
+            
+            secDosage.append(
+                buildCollapsibleSubheading(d.route, route)
+            );
+            secDosage.append(route);
         }
 
         secDosage.visible = true;
