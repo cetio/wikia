@@ -145,140 +145,14 @@ string name(Element elem)
     }
 }
 
-string symbol(Element elem)
-{
-    switch (elem)
-    {
-        case Element.H: return "H";
-        case Element.He: return "He";
-        case Element.Li: return "Li";
-        case Element.Be: return "Be";
-        case Element.B: return "B";
-        case Element.C: return "C";
-        case Element.N: return "N";
-        case Element.O: return "O";
-        case Element.F: return "F";
-        case Element.Ne: return "Ne";
-        case Element.Na: return "Na";
-        case Element.Mg: return "Mg";
-        case Element.Al: return "Al";
-        case Element.Si: return "Si";
-        case Element.P: return "P";
-        case Element.S: return "S";
-        case Element.Cl: return "Cl";
-        case Element.Ar: return "Ar";
-        case Element.K: return "K";
-        case Element.Ca: return "Ca";
-        case Element.Sc: return "Sc";
-        case Element.Ti: return "Ti";
-        case Element.V: return "V";
-        case Element.Cr: return "Cr";
-        case Element.Mn: return "Mn";
-        case Element.Fe: return "Fe";
-        case Element.Co: return "Co";
-        case Element.Ni: return "Ni";
-        case Element.Cu: return "Cu";
-        case Element.Zn: return "Zn";
-        case Element.Ga: return "Ga";
-        case Element.Ge: return "Ge";
-        case Element.As: return "As";
-        case Element.Se: return "Se";
-        case Element.Br: return "Br";
-        case Element.Kr: return "Kr";
-        case Element.Rb: return "Rb";
-        case Element.Sr: return "Sr";
-        case Element.Y: return "Y";
-        case Element.Zr: return "Zr";
-        case Element.Nb: return "Nb";
-        case Element.Mo: return "Mo";
-        case Element.Tc: return "Tc";
-        case Element.Ru: return "Ru";
-        case Element.Rh: return "Rh";
-        case Element.Pd: return "Pd";
-        case Element.Ag: return "Ag";
-        case Element.Cd: return "Cd";
-        case Element.In: return "In";
-        case Element.Sn: return "Sn";
-        case Element.Sb: return "Sb";
-        case Element.Te: return "Te";
-        case Element.I: return "I";
-        case Element.Xe: return "Xe";
-        case Element.Cs: return "Cs";
-        case Element.Ba: return "Ba";
-        case Element.La: return "La";
-        case Element.Ce: return "Ce";
-        case Element.Pr: return "Pr";
-        case Element.Nd: return "Nd";
-        case Element.Pm: return "Pm";
-        case Element.Sm: return "Sm";
-        case Element.Eu: return "Eu";
-        case Element.Gd: return "Gd";
-        case Element.Tb: return "Tb";
-        case Element.Dy: return "Dy";
-        case Element.Ho: return "Ho";
-        case Element.Er: return "Er";
-        case Element.Tm: return "Tm";
-        case Element.Yb: return "Yb";
-        case Element.Lu: return "Lu";
-        case Element.Hf: return "Hf";
-        case Element.Ta: return "Ta";
-        case Element.W: return "W";
-        case Element.Re: return "Re";
-        case Element.Os: return "Os";
-        case Element.Ir: return "Ir";
-        case Element.Pt: return "Pt";
-        case Element.Au: return "Au";
-        case Element.Hg: return "Hg";
-        case Element.Tl: return "Tl";
-        case Element.Pb: return "Pb";
-        case Element.Bi: return "Bi";
-        case Element.Po: return "Po";
-        case Element.At: return "At";
-        case Element.Rn: return "Rn";
-        case Element.Fr: return "Fr";
-        case Element.Ra: return "Ra";
-        case Element.Ac: return "Ac";
-        case Element.Th: return "Th";
-        case Element.Pa: return "Pa";
-        case Element.U: return "U";
-        case Element.Np: return "Np";
-        case Element.Pu: return "Pu";
-        case Element.Am: return "Am";
-        case Element.Cm: return "Cm";
-        case Element.Bk: return "Bk";
-        case Element.Cf: return "Cf";
-        case Element.Es: return "Es";
-        case Element.Fm: return "Fm";
-        case Element.Md: return "Md";
-        case Element.No: return "No";
-        case Element.Lr: return "Lr";
-        case Element.Rf: return "Rf";
-        case Element.Db: return "Db";
-        case Element.Sg: return "Sg";
-        case Element.Bh: return "Bh";
-        case Element.Hs: return "Hs";
-        case Element.Mt: return "Mt";
-        case Element.Ds: return "Ds";
-        case Element.Rg: return "Rg";
-        case Element.Cn: return "Cn";
-        case Element.Nh: return "Nh";
-        case Element.Fl: return "Fl";
-        case Element.Mc: return "Mc";
-        case Element.Lv: return "Lv";
-        case Element.Ts: return "Ts";
-        case Element.Og: return "Og";
-        default: return "?";
-    }
-}
-
 struct Atom3D
 {
     int aid;
     Element element;
     double x, y, z;
 
-    string symbol() const
-        => element.symbol;
+    string name() const
+        => element.name;
 }
 
 struct Bond3D

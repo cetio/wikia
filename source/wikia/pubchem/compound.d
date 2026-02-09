@@ -31,11 +31,7 @@ class Compound
         registry[cid] = c;
         return c;
     }
-
-    int cid;
-    int[] sids;
-    Properties properties;
-
+    
 package:
     this(int cid)
     {
@@ -47,6 +43,10 @@ package:
     string[] _synonyms;
 
 public:
+    int cid;
+    int[] sids;
+    Properties properties;
+
     ref string name()
     {
         if (properties.title == null)

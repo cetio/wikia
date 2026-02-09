@@ -12,15 +12,17 @@ struct Section
 
 class Page
 {
+package:
+    string _raw;
+    Section[] _sections;
+    void delegate(Page) _fetchContent;
+
+    this() { }
+
+public:
     string title;
     string source;
     string url;
-    Section[] _sections;
-    string _raw;
-
-    private void delegate(Page) _fetchContent;
-
-    package this() { }
 
     this(string title, string source, string url,
         void delegate(Page) fetchContent)

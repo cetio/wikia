@@ -66,7 +66,7 @@ Page[] getPages(string DB)(string term, int limit = 10)
         return [];
 
     Page[] ret;
-    foreach (JSONValue res; json["query"]["search"].array)
+    foreach (res; json["query"]["search"].array)
     {
         string title = res["title"].str;
         ret ~= new Page(title, "wikipedia",
@@ -94,7 +94,7 @@ Page[] getPagesByTitle(string DB)(string[] titles...)
         return [];
 
     Page[] ret;
-    foreach (JSONValue pg; json["query"]["pages"].array)
+    foreach (pg; json["query"]["pages"].array)
     {
         if ("missing" in pg)
             continue;

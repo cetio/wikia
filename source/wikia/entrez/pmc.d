@@ -4,7 +4,7 @@ import std.json : JSONValue;
 import std.algorithm : map;
 import std.array : array;
 import std.regex : matchAll, matchFirst, ctRegex, regex;
-import std.string : strip, replace;
+import std.string : strip, replace, indexOf;
 
 import wikia.entrez.eutils;
 import wikia.page;
@@ -106,7 +106,6 @@ string getDOI(Page page)
     if (page is null || page._raw is null)
         return null;
 
-    import std.string : indexOf;
     string raw = page._raw;
     auto idx = raw.indexOf("DOI=");
     if (idx < 0)

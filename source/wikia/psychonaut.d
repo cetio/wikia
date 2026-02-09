@@ -68,7 +68,7 @@ Page[] getPages(string DB)(string term, int limit = 10)
         return [];
 
     Page[] ret;
-    foreach (JSONValue res; json["query"]["search"].array)
+    foreach (res; json["query"]["search"].array)
     {
         string title = res["title"].str;
         ret ~= new Page(title, "psychonaut",
@@ -97,7 +97,7 @@ Page[] getPagesByTitle(string DB)(string[] titles...)
         return [];
 
     Page[] ret;
-    foreach (JSONValue pg; json["query"]["pages"].array)
+    foreach (pg; json["query"]["pages"].array)
     {
         if ("missing" in pg)
             continue;
@@ -110,11 +110,13 @@ Page[] getPagesByTitle(string DB)(string[] titles...)
     return ret;
 }
 
-Page[] getReports(string substance, int limit = 20)
+// TODO: [[Effect::Cognitive euphoria]] effect parsing
+// TODO: [[DangerousInteraction::Alcohol]] interaction parsing
+Page[] getReports(Page page, int limit = 20)
 {
     JSONValue json = query([
         "action": "query", "list": "search",
-        "srsearch": "intitle:Experience:"~substance,
+        "srsearch": "intitle:Experience:"~page.title,
         "srlimit": limit.to!string, "srnamespace": "0",
         "srprop": "snippet|titlesnippet"
     ]);
@@ -123,7 +125,7 @@ Page[] getReports(string substance, int limit = 20)
         return [];
 
     Page[] ret;
-    foreach (JSONValue res; json["query"]["search"].array)
+    foreach (res; json["query"]["search"].array)
     {
         string title = res["title"].str;
         ret ~= new Page(title, "psychonaut",
