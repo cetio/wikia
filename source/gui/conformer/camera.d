@@ -15,12 +15,21 @@ struct Camera
         double cosX = cos(rotationX), sinX = sin(rotationX);
         double cosY = cos(rotationY), sinY = sin(rotationY);
 
-        double y1 = y * cosX - z * sinX;
-        double z1 = y * sinX + z * cosX;
+        double x1 = x * cosY + z * sinY;
+        double z1 = -x * sinY + z * cosY;
 
-        double x2 = x * cosY + z1 * sinY;
+        double y2 = y * cosX - z1 * sinX;
 
-        return [x2 * zoom, y1 * zoom];
+        return [x1 * zoom, y2 * zoom];
+    }
+
+    double depth(double x, double y, double z)
+    {
+        double cosX = cos(rotationX), sinX = sin(rotationX);
+        double cosY = cos(rotationY), sinY = sin(rotationY);
+
+        double z1 = -x * sinY + z * cosY;
+        return y * sinX + z1 * cosX;
     }
 
     void rotate(double deltaX, double deltaY)

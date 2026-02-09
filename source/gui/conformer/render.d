@@ -1,14 +1,24 @@
 module gui.conformer.render;
 
 import std.math;
+import std.algorithm : clamp, sort;
 import std.conv : to;
 
 import cairo.context : Context;
 import cairo.types : FontSlant, FontWeight, TextExtents;
 
 import gui.conformer.camera : Camera;
+import gui.conformer.math : distanceMesh;
+import gui.conformer.view : MoleculeView;
 
 import wikia.pubchem.conformer3d;
+
+private struct DrawCmd
+{
+    Bond3D[] bonds;
+    double depth;
+    int idx;
+}
 
 double[3] getColor(Element elem)
 {
@@ -44,167 +54,217 @@ double getRadius(Element elem)
     }
 }
 
-void drawBackground(Context cr)
+void drawBackground(Context ctx)
 {
-    cr.setSourceRgb(0.2, 0.2, 0.2);
-    cr.paint();
+    ctx.setSourceRgb(0.2, 0.2, 0.2);
+    ctx.paint();
 }
 
-void drawGrid(Context cr, int width, int height)
+void drawGrid(MoleculeView view, Context ctx)
 {
-    cr.setSourceRgba(0.5, 0.5, 0.5, 0.3);
-    cr.setLineWidth(1);
+    ctx.setSourceRgba(0.5, 0.5, 0.5, 0.3);
+    ctx.setLineWidth(1);
     double gridSize = 20.0;
-    for (double x = 0; x < width; x += gridSize)
+    for (double x = 0; x < view.getAllocatedWidth(); x += gridSize)
     {
-        cr.moveTo(x, 0);
-        cr.lineTo(x, height);
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, view.getAllocatedHeight());
     }
     
-    for (double y = 0; y < height; y += gridSize)
+    for (double y = 0; y < view.getAllocatedHeight(); y += gridSize)
     {
-        cr.moveTo(0, y);
-        cr.lineTo(width, y);
+        ctx.moveTo(0, y);
+        ctx.lineTo(view.getAllocatedWidth(), y);
     }
-    cr.stroke();
+    ctx.stroke();
 }
 
-void drawBackgroundText(Context cr, string name, int width, int height)
+void drawBackgroundText(MoleculeView view, Context ctx)
 {
-    if (name == null)
+    if (view.compound.name is null)
         return;
 
-    cr.selectFontFace("Sans", FontSlant.Normal, FontWeight.Bold);
-    cr.setFontSize(120);
+    ctx.selectFontFace("Sans", FontSlant.Normal, FontWeight.Bold);
+    ctx.setFontSize(120);
     TextExtents extents;
-    cr.textExtents(name, extents);
+    ctx.textExtents(view.compound.name, extents);
 
-    double textX = (width - extents.width) / 2.0;
-    double textY = (height + extents.height) / 2.0;
+    double textX = (view.getAllocatedWidth() - extents.width) / 2.0;
+    double textY = (view.getAllocatedHeight() + extents.height) / 2.0;
 
-    cr.setSourceRgba(1, 1, 1, 0.08);
-    cr.moveTo(textX, textY);
-    cr.showText(name);
+    ctx.setSourceRgba(1, 1, 1, 0.08);
+    ctx.moveTo(textX, textY);
+    ctx.showText(view.compound.name);
 }
 
-void drawMolecule(
-    Context cr, 
-    Conformer3D conformer, 
-    Camera cam, 
-    int width, 
-    int height
-)
+void drawMolecule(MoleculeView view, Context ctx)
 {
+    Conformer3D conformer = view.compound.conformer3D;
     if (conformer is null || !conformer.isValid())
         return;
 
-    double centerX = width / 2.0;
-    double centerY = height / 2.0;
+    double centerX = view.getAllocatedWidth() / 2.0;
+    double centerY = view.getAllocatedHeight() / 2.0;
 
+    double[int] distances = distanceMesh(
+        view, view.mouseX, view.mouseY,
+        view.getAllocatedWidth(), view.getAllocatedHeight()
+    );
+
+    double[] px = new double[conformer.atoms.length];
+    double[] py = new double[conformer.atoms.length];
+    double[] pz = new double[conformer.atoms.length];
+    double[] ar = new double[conformer.atoms.length];
+
+    foreach (i, atom; conformer.atoms)
+    {
+        double[2] proj = view.camera.project(atom.x, atom.y, atom.z);
+        px[i] = centerX + proj[0];
+        py[i] = centerY + proj[1];
+        pz[i] = view.camera.depth(atom.x, atom.y, atom.z);
+
+        double base = getRadius(atom.element) * view.camera.zoom * 0.3;
+        double dist = distances.get(cast(int)i, double.max);
+        ar[i] = base * clamp(1.02 + 0.02 * (20.0 - dist), 1.0, 1.30);
+    }
+
+    DrawCmd[] cmds = new DrawCmd[conformer.atoms.length];
+    foreach (i; 0..conformer.atoms.length)
+        cmds[i] = DrawCmd(null, pz[i], cast(int)i);
+
+    // Sort the atoms by depth for occlusion and then we add the bonds so that the bonds occlude properly.
+    // If we render the bonds before the atoms, they will always be occluded.
+    // If we render the bonds after the atoms, they will occlude the atoms.
+    // We don't need to do more distance calculations if we just use the depth we already calculated for atoms.
+    cmds.sort!((DrawCmd a, DrawCmd b) => a.depth < b.depth);
     foreach (bond; conformer.bonds)
     {
-        int idx1 = conformer.indexOf(bond.aid1);
-        int idx2 = conformer.indexOf(bond.aid2);
-
-        if (idx1 < 0 || idx2 < 0)
-            continue;
-
-        double[2] proj1 = cam.project(conformer.atoms[idx1].x, conformer.atoms[idx1].y, conformer.atoms[idx1].z);
-        double[2] proj2 = cam.project(conformer.atoms[idx2].x, conformer.atoms[idx2].y, conformer.atoms[idx2].z);
-
-        cr.setLineWidth(bond.order == 1 ? 2.0 : (bond.order == 2 ? 3.0 : 4.0));
-        cr.setSourceRgba(0.6, 0.6, 0.7, 0.8);
-        cr.moveTo(centerX + proj1[0], centerY + proj1[1]);
-        cr.lineTo(centerX + proj2[0], centerY + proj2[1]);
-        cr.stroke();
-
-        if (bond.order >= 2)
+        foreach (ref cmd; cmds)
         {
-            double dx = proj2[0] - proj1[0];
-            double dy = proj2[1] - proj1[1];
-            double len = sqrt(dx * dx + dy * dy);
-            
-            if (len > 0)
-            {
-                double nx = -dy / len * 3;
-                double ny = dx / len * 3;
+            int idx1 = conformer.indexOf(bond.aid1);
+            int idx2 = conformer.indexOf(bond.aid2);
 
-                cr.setLineWidth(1.5);
-                cr.moveTo(centerX + proj1[0] + nx, centerY + proj1[1] + ny);
-                cr.lineTo(centerX + proj2[0] + nx, centerY + proj2[1] + ny);
-                cr.stroke();
+            if (idx1 == cmd.idx || idx2 == cmd.idx)
+            {
+                cmd.bonds ~= bond;
+                break;
             }
         }
     }
 
-    foreach (atom; conformer.atoms)
+    foreach (cmd; cmds)
     {
-        double radius = getRadius(atom.element) * cam.zoom * 0.3;
-        double[2] proj = cam.project(atom.x, atom.y, atom.z);
-        double[3] color = getColor(atom.element);
+        foreach (bond; cmd.bonds)
+        {
+            int idx1 = conformer.indexOf(bond.aid1);
+            int idx2 = conformer.indexOf(bond.aid2);
 
-        cr.setSourceRgb(color[0], color[1], color[2]);
-        cr.arc(centerX + proj[0], centerY + proj[1], radius, 0, 2 * PI);
-        cr.fillPreserve();
-        cr.setSourceRgba(1, 1, 1, 0.3);
-        cr.setLineWidth(1);
-        cr.stroke();
+            double w = fmin(ar[idx1], ar[idx2]);
+            double dx = px[idx2] - px[idx1];
+            double dy = py[idx2] - py[idx1];
+            double len = sqrt(dx * dx + dy * dy);
+            if (len == 0)
+                continue;
+
+            double nx = -dy / len;
+            double ny = dx / len;
+
+            ctx.setSourceRgba(0.6, 0.6, 0.7, 1);
+
+            if (bond.order == 1)
+            {
+                ctx.setLineWidth(w);
+                ctx.moveTo(px[idx1], py[idx1]);
+                ctx.lineTo(px[idx2], py[idx2]);
+                ctx.stroke();
+            }
+            else if (bond.order == 2)
+            {
+                double offset = w * 0.55;
+                ctx.setLineWidth(w * 0.45);
+                ctx.moveTo(px[idx1] + nx * offset, py[idx1] + ny * offset);
+                ctx.lineTo(px[idx2] + nx * offset, py[idx2] + ny * offset);
+                ctx.stroke();
+                ctx.moveTo(px[idx1] - nx * offset, py[idx1] - ny * offset);
+                ctx.lineTo(px[idx2] - nx * offset, py[idx2] - ny * offset);
+                ctx.stroke();
+            }
+            else
+            {
+                double offset = w * 0.75;
+                ctx.setLineWidth(w * 0.35);
+                ctx.moveTo(px[idx1], py[idx1]);
+                ctx.lineTo(px[idx2], py[idx2]);
+                ctx.stroke();
+                ctx.moveTo(px[idx1] + nx * offset, py[idx1] + ny * offset);
+                ctx.lineTo(px[idx2] + nx * offset, py[idx2] + ny * offset);
+                ctx.stroke();
+                ctx.moveTo(px[idx1] - nx * offset, py[idx1] - ny * offset);
+                ctx.lineTo(px[idx2] - nx * offset, py[idx2] - ny * offset);
+                ctx.stroke();
+            }
+        }
+
+        double[3] color = getColor(conformer.atoms[cmd.idx].element);
+
+        ctx.setSourceRgb(color[0], color[1], color[2]);
+        ctx.moveTo(px[cmd.idx] + ar[cmd.idx], py[cmd.idx]);
+        ctx.arc(px[cmd.idx], py[cmd.idx], ar[cmd.idx], 0, 2 * PI);
+        ctx.fill();
+
+        ctx.setSourceRgba(1, 1, 1, 1);
+        ctx.setLineWidth(1);
+        ctx.moveTo(px[cmd.idx] + ar[cmd.idx], py[cmd.idx]);
+        ctx.arc(px[cmd.idx], py[cmd.idx], ar[cmd.idx], 0, 2 * PI);
+        ctx.stroke();
     }
 }
 
-void drawInfoText(
-    Context cr, 
-    int atoms, 
-    int bonds,
-    int height
-)
+void drawInfoText(MoleculeView view, Context ctx)
 {
-    cr.setSourceRgb(1, 1, 1);
-    cr.selectFontFace("Sans", FontSlant.Normal, FontWeight.Normal);
-    cr.setFontSize(11);
-    cr.moveTo(10, height - 10);
-    cr.showText("Atoms: "~atoms.to!string~"  Bonds: "~bonds.to!string);
+    Conformer3D conformer = view.compound.conformer3D;
+    
+    ctx.setSourceRgb(1, 1, 1);
+    ctx.selectFontFace("Sans", FontSlant.Normal, FontWeight.Normal);
+    ctx.setFontSize(11);
+    ctx.moveTo(10, view.getAllocatedHeight() - 10);
+    ctx.showText(
+        "Atoms: "~conformer.atoms.length.to!string~"  Bonds: "~conformer.bonds.length.to!string
+    );
 }
 
-void drawTooltip(
-    Context cr, 
-    string text, 
-    double x, 
-    double y, 
-    int width,
-    int height
-)
+void drawTooltip(MoleculeView view, Context ctx)
 {
-    if (text == null)
+    if (view.tooltip == null)
         return;
 
-    cr.selectFontFace("Sans", FontSlant.Normal, FontWeight.Normal);
-    cr.setFontSize(12);
+    ctx.selectFontFace("Sans", FontSlant.Normal, FontWeight.Normal);
+    ctx.setFontSize(12);
     TextExtents extents;
-    cr.textExtents(text, extents);
+    ctx.textExtents(view.tooltip, extents);
 
     double paddingX = 8;
     double boxWidth = extents.width + paddingX * 2;
     double boxHeight = 24;
-    double boxX = x + 15;
-    double boxY = y - boxHeight - 5;
+    double boxX = view.mouseX + 15;
+    double boxY = view.mouseY - boxHeight - 5;
 
-    if (boxX + boxWidth > width)
-        boxX = x - boxWidth - 15;
+    if (boxX + boxWidth > view.getAllocatedWidth())
+        boxX = view.mouseX - boxWidth - 15;
     if (boxY < 0)
-        boxY = y + 15;
+        boxY = view.mouseY + 15;
 
-    cr.setSourceRgba(0, 0, 0, 0.85);
-    cr.rectangle(boxX, boxY, boxWidth, boxHeight);
-    cr.fill();
+    ctx.setSourceRgba(0, 0, 0, 0.85);
+    ctx.rectangle(boxX, boxY, boxWidth, boxHeight);
+    ctx.fill();
 
-    cr.setSourceRgb(1, 1, 1);
-    cr.rectangle(boxX, boxY, boxWidth, boxHeight);
-    cr.setLineWidth(1);
-    cr.stroke();
+    ctx.setSourceRgb(1, 1, 1);
+    ctx.rectangle(boxX, boxY, boxWidth, boxHeight);
+    ctx.setLineWidth(1);
+    ctx.stroke();
 
-    cr.setSourceRgb(1, 1, 1);
+    ctx.setSourceRgb(1, 1, 1);
     double textY = boxY + boxHeight / 2.0 + extents.height / 2.0 - 1;
-    cr.moveTo(boxX + paddingX, textY);
-    cr.showText(text);
+    ctx.moveTo(boxX + paddingX, textY);
+    ctx.showText(view.tooltip);
 }

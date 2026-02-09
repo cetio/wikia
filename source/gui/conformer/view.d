@@ -11,7 +11,7 @@ import gtk.gesture_drag;
 import gtk.types : EventControllerScrollFlags;
 
 import gui.conformer.camera : Camera;
-import gui.conformer.hit : HitResult, hitTest;
+import gui.conformer.math : distanceMesh, bondHit, atomHit;
 import gui.conformer.render;
 
 import wikia.pubchem.compound : Compound;
@@ -22,8 +22,8 @@ class MoleculeView : DrawingArea
 package:
     Compound compound;
     Camera camera;
-    double dragStartRotX;
-    double dragStartRotY;
+    double lastDragX;
+    double lastDragY;
     bool motionControl;
 
     string tooltip;
@@ -43,18 +43,18 @@ public:
 
         setDrawFunc(&onDraw);
 
-        auto dragGesture = new gtk.gesture_drag.GestureDrag();
+        GestureDrag dragGesture = new gtk.gesture_drag.GestureDrag();
         dragGesture.connectDragBegin(&onDragBegin);
         dragGesture.connectDragUpdate(&onDragUpdate);
         addController(dragGesture);
 
-        auto scrollController = new gtk.event_controller_scroll.EventControllerScroll(
+        EventControllerScroll scrollController = new gtk.event_controller_scroll.EventControllerScroll(
             EventControllerScrollFlags.Vertical
         );
         scrollController.connectScroll(&onScroll);
         addController(scrollController);
 
-        auto motionController = new gtk.event_controller_motion.EventControllerMotion();
+        EventControllerMotion motionController = new gtk.event_controller_motion.EventControllerMotion();
         motionController.connectMotion(&onMotion);
         motionController.connectLeave(&onLeave);
         addController(motionController);
@@ -91,8 +91,8 @@ private:
         if (!motionControl)
             return;
         
-        dragStartRotX = camera.rotationX;
-        dragStartRotY = camera.rotationY;
+        lastDragX = 0;
+        lastDragY = 0;
     }
 
     void onDragUpdate(double x, double y)
@@ -100,8 +100,13 @@ private:
         if (!motionControl)
             return;
         
-        camera.rotationY = dragStartRotY + x * 0.01;
-        camera.rotationX = dragStartRotX + y * 0.01;
+        double dx = x - lastDragX;
+        double dy = y - lastDragY;
+        lastDragX = x;
+        lastDragY = y;
+
+        camera.rotationY += dx * 0.01;
+        camera.rotationX -= dy * 0.01;
         queueDraw();
     }
 
@@ -124,21 +129,15 @@ private:
         if (conformer is null || !conformer.isValid())
             return;
 
-        HitResult hit = hitTest(
-            x, 
-            y, 
-            getAllocatedWidth(), 
-            getAllocatedHeight(), 
-            conformer, 
-            camera
-        );
+        int bondIdx = bondHit(this, x, y, getAllocatedWidth(), getAllocatedHeight());
+        int atomIdx = atomHit(this, x, y, getAllocatedWidth(), getAllocatedHeight());
 
         if (mouseX != x || mouseY != y)
         {
-            if (hit.atomIdx >= 0)
-                tooltip = conformer.atoms[hit.atomIdx].element.name;
-            else if (hit.bondIdx >= 0)
-                tooltip = formatBondTooltip(conformer.bonds[hit.bondIdx]);
+            if (atomIdx >= 0)
+                tooltip = conformer.atoms[atomIdx].element.name;
+            else if (bondIdx >= 0)
+                tooltip = formatBondTooltip(conformer.bonds[bondIdx]);
 
             queueDraw();
         }
@@ -169,46 +168,23 @@ private:
         return conformer.atoms[idx1].element.name~"-"~conformer.atoms[idx2].element.name~" "~bondType;
     }
 
-    void onDraw(DrawingArea, Context cr, int width, int height)
+    void onDraw(DrawingArea, Context ctx, int width, int height)
     {
-        drawBackground(cr);
-        drawGrid(cr, width, height);
-        drawBackgroundText(
-            cr, 
-            compound.name, 
-            width, 
-            height
-        );
+        // TODO: Should run a hit test to automatically highlight hovered atom/bond and have depth effect of highlighting nearby atom/bonds in 3D
+        drawBackground(ctx);
+        drawGrid(this, ctx);
+        drawBackgroundText(this, ctx);
 
         if (compound.conformer3D is null || !compound.conformer3D.isValid())
             return;
 
-        drawMolecule(
-            cr, 
-            compound.conformer3D, 
-            camera, 
-            width, 
-            height
-        );
+        drawMolecule(this, ctx);
+        drawInfoText(this, ctx);
 
         if (tooltip != null)
         {
-            drawTooltip(
-                cr, 
-                tooltip, 
-                mouseX, 
-                mouseY, 
-                width, 
-                height
-            );
+            drawTooltip(this, ctx);
             tooltip = null;
         }
-
-        drawInfoText(
-            cr, 
-            cast(int)compound.conformer3D.atoms.length, 
-            cast(int)compound.conformer3D.bonds.length, 
-            height
-        );
     }
 }

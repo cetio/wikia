@@ -1,48 +1,55 @@
-module gui.conformer.hit;
+module gui.conformer.math;
 
 import std.math;
 import std.algorithm;
+import std.array;
 import gui.conformer.camera;
 import gui.conformer.render : getRadius;
+import gui.conformer.view : MoleculeView;
 import wikia.pubchem.conformer3d;
 
-struct HitResult
+double[int] distanceMesh(MoleculeView view, double mouseX, double mouseY, int width, int height)
 {
-    int atomIdx = -1;
-    int bondIdx = -1;
+    double[int] distances;
 
-    bool isValid() const 
-        => atomIdx > -1 || bondIdx > -1;
-}
+    if (view.compound is null || view.compound.conformer3D is null || !view.compound.conformer3D.isValid())
+        return distances;
 
-HitResult hitTest(
-    double mouseX, 
-    double mouseY, 
-    int width, 
-    int height, 
-    Conformer3D conformer, 
-    Camera cam
-)
-{
-    HitResult ret;
+    Conformer3D conformer = view.compound.conformer3D;
+    Camera cam = view.camera;
 
-    if (conformer is null || !conformer.isValid())
-        return ret;
-
-    double centerX = width / 2.0;
-    double centerY = height / 2.0;
-
-    double mx = mouseX - centerX;
-    double my = mouseY - centerY;
-
-    double closestAtomDist = double.max;
-    int hoveredAtomIdx = -1;
+    mouseX -= (width / 2.0);
+    mouseY -= (height / 2.0);
 
     foreach (i, atom; conformer.atoms)
     {
         double[2] proj = cam.project(atom.x, atom.y, atom.z);
         
-        double dist = sqrt((proj[0] - mx) * (proj[0] - mx) + (proj[1] - my) * (proj[1] - my));
+        double dist = sqrt((proj[0] - mouseX) * (proj[0] - mouseX) + (proj[1] - mouseY) * (proj[1] - mouseY));
+        distances[cast(int)i] = dist;
+    }
+
+    return distances;
+}
+
+int atomHit(MoleculeView view, double mouseX, double mouseY, int width, int height)
+{
+    if (view.compound is null || view.compound.conformer3D is null || !view.compound.conformer3D.isValid())
+        return -1;
+
+    Conformer3D conformer = view.compound.conformer3D;
+    Camera cam = view.camera;
+
+    mouseX -= (width / 2.0);
+    mouseY -= (height / 2.0);
+
+    double closestAtomDist = double.max;
+    int hoveredAtomIdx = -1;
+    foreach (i, atom; conformer.atoms)
+    {
+        double[2] proj = cam.project(atom.x, atom.y, atom.z);
+        
+        double dist = sqrt((proj[0] - mouseX) * (proj[0] - mouseX) + (proj[1] - mouseY) * (proj[1] - mouseY));
         double radius = getRadius(atom.element) * cam.zoom * 0.3;
 
         if (dist <= radius && dist < closestAtomDist)
@@ -52,15 +59,22 @@ HitResult hitTest(
         }
     }
 
-    if (hoveredAtomIdx != -1)
-    {
-        ret.atomIdx = hoveredAtomIdx;
-        return ret;
-    }
+    return hoveredAtomIdx;
+}
+
+int bondHit(MoleculeView view, double mouseX, double mouseY, int width, int height)
+{
+    if (view.compound is null || view.compound.conformer3D is null || !view.compound.conformer3D.isValid())
+        return -1;
+
+    Conformer3D conformer = view.compound.conformer3D;
+    Camera cam = view.camera;
+
+    mouseX -= (width / 2.0);
+    mouseY -= (height / 2.0);
 
     double closestBondDist = double.max;
     int hoveredBondIdx = -1;
-
     foreach (i, bond; conformer.bonds)
     {
         int idx1 = conformer.indexOf(bond.aid1);
@@ -72,7 +86,7 @@ HitResult hitTest(
         double[2] proj1 = cam.project(conformer.atoms[idx1].x, conformer.atoms[idx1].y, conformer.atoms[idx1].z);
         double[2] proj2 = cam.project(conformer.atoms[idx2].x, conformer.atoms[idx2].y, conformer.atoms[idx2].z);
 
-        double dist = distanceToLineSegment(mx, my, proj1[0], proj1[1], proj2[0], proj2[1]);
+        double dist = distanceToLineSegment(mouseX, mouseY, proj1[0], proj1[1], proj2[0], proj2[1]);
         double bondWidth = bond.order == 1 ? 2.0 : (bond.order == 2 ? 3.0 : 4.0);
 
         if (dist <= bondWidth && dist < closestBondDist)
@@ -82,12 +96,7 @@ HitResult hitTest(
         }
     }
 
-    if (hoveredBondIdx != -1)
-    {
-        ret.bondIdx = hoveredBondIdx;
-    }
-
-    return ret;
+    return hoveredBondIdx;
 }
 
 double distanceToLineSegment(double px, double py, double x1, double y1, double x2, double y2)
@@ -105,4 +114,3 @@ double distanceToLineSegment(double px, double py, double x1, double y1, double 
 
     return sqrt((px - projectionX) * (px - projectionX) + (py - projectionY) * (py - projectionY));
 }
-

@@ -125,7 +125,7 @@ class Background : DrawingArea
         splotches ~= s;
     }
 
-    private void drawBlob(Context cr, double cx, double cy, double baseRadius, int seed)
+    private void drawBlob(Context ctx, double cx, double cy, double baseRadius, int seed)
     {
         // Create irregular blob shape using multiple sine waves around circle.
         int points = 32;
@@ -147,7 +147,7 @@ class Background : DrawingArea
         }
 
         // Draw smooth curve through points.
-        cr.moveTo(cx + radii[0] * cos(angles[0]), cy + radii[0] * sin(angles[0]));
+        ctx.moveTo(cx + radii[0] * cos(angles[0]), cy + radii[0] * sin(angles[0]));
 
         foreach (i; 0..points)
         {
@@ -169,7 +169,7 @@ class Background : DrawingArea
                         (radii[next2] * sin(angles[next2]) - radii[next] * sin(angles[next])) * 0.3
             ];
 
-            cr.curveTo(
+            ctx.curveTo(
                 cp1[0], cp1[1], 
                 cp2[0], cp2[1], 
                 cx + radii[next] * cos(angles[next]), 
@@ -177,19 +177,19 @@ class Background : DrawingArea
             );
         }
 
-        cr.closePath();
+        ctx.closePath();
     }
 
-    private void drawBackground(DrawingArea, Context cr, int width, int height)
+    private void drawBackground(DrawingArea, Context ctx, int width, int height)
     {
-        cr.setSourceRgb(1.0, 1.0, 1.0);
-        cr.paint();
+        ctx.setSourceRgb(1.0, 1.0, 1.0);
+        ctx.paint();
 
         foreach (splotch; splotches)
         {
-            cr.setSourceRgba(splotch.r, splotch.g, splotch.b, splotch.alpha);
-            drawBlob(cr, splotch.x, splotch.y, splotch.radius, splotch.seed);
-            cr.fill();
+            ctx.setSourceRgba(splotch.r, splotch.g, splotch.b, splotch.alpha);
+            drawBlob(ctx, splotch.x, splotch.y, splotch.radius, splotch.seed);
+            ctx.fill();
         }
     }
 }
