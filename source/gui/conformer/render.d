@@ -60,6 +60,7 @@ void drawGrid(Context cr, int width, int height)
         cr.moveTo(x, 0);
         cr.lineTo(x, height);
     }
+    
     for (double y = 0; y < height; y += gridSize)
     {
         cr.moveTo(0, y);
