@@ -10,7 +10,7 @@ struct Camera
     double zoom = 40.0;
     double baseZoom = 40.0;
 
-    void project(double x, double y, double z, out double sx, out double sy)
+    double[2] project(double x, double y, double z)
     {
         double cosX = cos(rotationX), sinX = sin(rotationX);
         double cosY = cos(rotationY), sinY = sin(rotationY);
@@ -20,8 +20,7 @@ struct Camera
 
         double x2 = x * cosY + z1 * sinY;
 
-        sx = x2 * zoom;
-        sy = y1 * zoom;
+        return [x2 * zoom, y1 * zoom];
     }
 
     void rotate(double deltaX, double deltaY)

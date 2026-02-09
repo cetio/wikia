@@ -10,21 +10,21 @@ import gui.conformer.camera : Camera;
 
 import wikia.pubchem.conformer3d;
 
-void getColor(Element elem, out double r, out double g, out double b)
+double[3] getColor(Element elem)
 {
     switch (cast(int)elem)
     {
-        case 1:  r = 1.0; g = 1.0; b = 1.0; break;  // H - White
-        case 6:  r = 0.3; g = 0.3; b = 0.3; break;  // C - Dark gray
-        case 7:  r = 0.2; g = 0.4; b = 1.0; break;  // N - Blue
-        case 8:  r = 1.0; g = 0.2; b = 0.2; break;  // O - Red
-        case 9:  r = 0.0; g = 0.9; b = 0.2; break;  // F - Green
-        case 15: r = 1.0; g = 0.5; b = 0.0; break; // P - Orange
-        case 16: r = 1.0; g = 0.9; b = 0.2; break; // S - Yellow
-        case 17: r = 0.0; g = 0.9; b = 0.0; break; // Cl - Green
-        case 35: r = 0.6; g = 0.1; b = 0.1; break; // Br - Dark red
-        case 53: r = 0.6; g = 0.0; b = 0.6; break; // I - Purple
-        default: r = 0.7; g = 0.5; b = 0.7; break; // Light purple
+        case 1:  return [1.0, 1.0, 1.0];  // H - White
+        case 6:  return [0.3, 0.3, 0.3];  // C - Dark gray
+        case 7:  return [0.2, 0.4, 1.0];  // N - Blue
+        case 8:  return [1.0, 0.2, 0.2];  // O - Red
+        case 9:  return [0.0, 0.9, 0.2];  // F - Green
+        case 15: return [1.0, 0.5, 0.0]; // P - Orange
+        case 16: return [1.0, 0.9, 0.2]; // S - Yellow
+        case 17: return [0.0, 0.9, 0.0]; // Cl - Green
+        case 35: return [0.6, 0.1, 0.1]; // Br - Dark red
+        case 53: return [0.6, 0.0, 0.6]; // I - Purple
+        default: return [0.7, 0.5, 0.7]; // Light purple
     }
 }
 
@@ -87,8 +87,15 @@ void drawBackgroundText(Context cr, string name, int width, int height)
     cr.showText(name);
 }
 
-void drawMolecule(Context cr, Conformer3D conformer, Camera cam, int width, int height, 
-                  int hoveredAtomId, size_t hoveredBondIdx)
+void drawMolecule(
+    Context cr, 
+    Conformer3D conformer, 
+    Camera cam, 
+    int width, 
+    int height, 
+    int hoveredAtomId, 
+    size_t hoveredBondIdx
+)
 {
     if (conformer is null || !conformer.isValid())
         return;
@@ -104,13 +111,11 @@ void drawMolecule(Context cr, Conformer3D conformer, Camera cam, int width, int 
         if (idx1 < 0 || idx2 < 0)
             continue;
 
-        double sx1, sy1, sx2, sy2;
-        cam.project(conformer.atoms[idx1].x, conformer.atoms[idx1].y, conformer.atoms[idx1].z, sx1, sy1);
-        cam.project(conformer.atoms[idx2].x, conformer.atoms[idx2].y, conformer.atoms[idx2].z, sx2, sy2);
+        double[2] proj1 = cam.project(conformer.atoms[idx1].x, conformer.atoms[idx1].y, conformer.atoms[idx1].z);
+        double[2] proj2 = cam.project(conformer.atoms[idx2].x, conformer.atoms[idx2].y, conformer.atoms[idx2].z);
 
+        bool isHovered;
         double lineWidth = bond.order == 1 ? 2.0 : (bond.order == 2 ? 3.0 : 4.0);
-
-        bool isHovered = false;
         if (hoveredBondIdx != size_t.max)
         {
             Bond3D hb = conformer.bonds[hoveredBondIdx];
@@ -120,40 +125,40 @@ void drawMolecule(Context cr, Conformer3D conformer, Camera cam, int width, int 
 
         if (isHovered)
         {
-            double r1, g1, b1, r2, g2, b2;
-            getColor(conformer.atoms[idx1].element, r1, g1, b1);
-            getColor(conformer.atoms[idx2].element, r2, g2, b2);
+            double[3] color1 = getColor(conformer.atoms[idx1].element);
+            double[3] color2 = getColor(conformer.atoms[idx2].element);
 
-            double avgR = (r1 + r2) / 2.0;
-            double avgG = (g1 + g2) / 2.0;
-            double avgB = (b1 + b2) / 2.0;
-
+            cr.setSourceRgb(
+                (color1[0] + color2[0]) / 2.0,
+                (color1[1] + color2[1]) / 2.0,
+                (color1[2] + color2[2]) / 2.0
+            );
             cr.setLineWidth(lineWidth + 4);
-            cr.setSourceRgb(avgR, avgG, avgB);
-            cr.moveTo(centerX + sx1, centerY + sy1);
-            cr.lineTo(centerX + sx2, centerY + sy2);
+            cr.moveTo(centerX + proj1[0], centerY + proj1[1]);
+            cr.lineTo(centerX + proj2[0], centerY + proj2[1]);
             cr.stroke();
         }
 
         cr.setLineWidth(lineWidth);
         cr.setSourceRgba(0.6, 0.6, 0.7, 0.8);
-        cr.moveTo(centerX + sx1, centerY + sy1);
-        cr.lineTo(centerX + sx2, centerY + sy2);
+        cr.moveTo(centerX + proj1[0], centerY + proj1[1]);
+        cr.lineTo(centerX + proj2[0], centerY + proj2[1]);
         cr.stroke();
 
         if (bond.order >= 2)
         {
-            double dx = sx2 - sx1;
-            double dy = sy2 - sy1;
+            double dx = proj2[0] - proj1[0];
+            double dy = proj2[1] - proj1[1];
             double len = sqrt(dx * dx + dy * dy);
+            
             if (len > 0)
             {
                 double nx = -dy / len * 3;
                 double ny = dx / len * 3;
 
                 cr.setLineWidth(1.5);
-                cr.moveTo(centerX + sx1 + nx, centerY + sy1 + ny);
-                cr.lineTo(centerX + sx2 + nx, centerY + sy2 + ny);
+                cr.moveTo(centerX + proj1[0] + nx, centerY + proj1[1] + ny);
+                cr.lineTo(centerX + proj2[0] + nx, centerY + proj2[1] + ny);
                 cr.stroke();
             }
         }
@@ -161,25 +166,20 @@ void drawMolecule(Context cr, Conformer3D conformer, Camera cam, int width, int 
 
     foreach (atom; conformer.atoms)
     {
-        double sx, sy;
-        cam.project(atom.x, atom.y, atom.z, sx, sy);
-
-        double r, g, b;
-        getColor(atom.element, r, g, b);
         double radius = getRadius(atom.element) * cam.zoom * 0.3;
+        double[2] proj = cam.project(atom.x, atom.y, atom.z);
+        double[3] color = getColor(atom.element);
 
-        bool isHovered = (atom.aid == hoveredAtomId);
-
-        if (isHovered)
+        if (atom.aid == hoveredAtomId)
         {
-            cr.arc(centerX + sx, centerY + sy, radius + 3, 0, 2 * PI);
-            cr.setSourceRgb(r, g, b);
+            cr.arc(centerX + proj[0], centerY + proj[1], radius + 3, 0, 2 * PI);
+            cr.setSourceRgb(color[0], color[1], color[2]);
             cr.setLineWidth(2);
             cr.stroke();
         }
 
-        cr.arc(centerX + sx, centerY + sy, radius, 0, 2 * PI);
-        cr.setSourceRgb(r, g, b);
+        cr.setSourceRgb(color[0], color[1], color[2]);
+        cr.arc(centerX + proj[0], centerY + proj[1], radius, 0, 2 * PI);
         cr.fillPreserve();
         cr.setSourceRgba(1, 1, 1, 0.3);
         cr.setLineWidth(1);
@@ -187,7 +187,12 @@ void drawMolecule(Context cr, Conformer3D conformer, Camera cam, int width, int 
     }
 }
 
-void drawInfoText(Context cr, int atoms, int bonds, int width, int height)
+void drawInfoText(
+    Context cr, 
+    int atoms, 
+    int bonds,
+    int height
+)
 {
     cr.setSourceRgb(1, 1, 1);
     cr.selectFontFace("Sans", FontSlant.Normal, FontWeight.Normal);
@@ -197,7 +202,14 @@ void drawInfoText(Context cr, int atoms, int bonds, int width, int height)
     cr.showText(info);
 }
 
-void drawTooltip(Context cr, string text, double x, double y, int width, int height)
+void drawTooltip(
+    Context cr, 
+    string text, 
+    double x, 
+    double y, 
+    int width,
+    int height
+)
 {
     if (text is null)
         return;
@@ -231,13 +243,4 @@ void drawTooltip(Context cr, string text, double x, double y, int width, int hei
     double textY = boxY + boxHeight / 2.0 + extents.height / 2.0 - 1;
     cr.moveTo(boxX + paddingX, textY);
     cr.showText(text);
-}
-
-void drawPlaceholder(Context cr, int width, int height)
-{
-    cr.setSourceRgb(0.5, 0.5, 0.6);
-    cr.selectFontFace("Sans", FontSlant.Normal, FontWeight.Normal);
-    cr.setFontSize(14);
-    cr.moveTo(width / 2.0 - 80, height / 2.0);
-    cr.showText("Select a compound to view");
 }

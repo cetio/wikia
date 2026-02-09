@@ -1,22 +1,32 @@
 module gui.article.view;
 
+import std.stdio : writeln;
 import gtk.box;
 import gtk.label;
 import gtk.button;
 import gtk.scrolled_window;
 import gtk.overlay;
+import gtk.gesture_click;
 import gtk.types : Orientation, Align, PolicyType;
 
-import gui.article.infobox : Infobox;
+import gui.article.infobox;
+import gui.conformer.view;
+import wikia.pubchem;
+import wikia.psychonaut : DosageResult;
 
 class ArticleView : Overlay
 {
-    private Infobox infobox;
-    private ScrolledWindow scroller;
-    private Box articleBox;
-    private Box textColumn;
-    private Label placeholderLabel;
+private:
+    ScrolledWindow scroller;
+    Box content;
+    Box textColumn;
+    Label placeholderLabel;
+    
+    MoleculeView moleculeView;
+    Overlay screenOverlay;
 
+public:
+    Infobox infobox;
     void delegate() onGoHome;
 
     this()
@@ -31,10 +41,10 @@ class ArticleView : Overlay
         scroller.vexpand = true;
         scroller.setPolicy(PolicyType.Never, PolicyType.Automatic);
 
-        articleBox = new Box(Orientation.Horizontal, 0);
-        articleBox.addCssClass("article-body");
-        articleBox.hexpand = true;
-        articleBox.valign = Align.Start;
+        content = new Box(Orientation.Horizontal, 0);
+        content.addCssClass("article-content");
+        content.hexpand = true;
+        content.valign = Align.Start;
 
         textColumn = new Box(Orientation.Vertical, 0);
         textColumn.hexpand = true;
@@ -46,19 +56,28 @@ class ArticleView : Overlay
         placeholderLabel.valign = Align.Start;
         textColumn.append(placeholderLabel);
 
-        articleBox.append(textColumn);
+        content.append(textColumn);
 
-        infobox = new Infobox();
-        articleBox.append(infobox);
+        GestureClick viewerClick = new GestureClick();
+        viewerClick.connectReleased(&onViewerClicked);
 
-        scroller.setChild(articleBox);
+        moleculeView = new MoleculeView();
+        moleculeView.addController(viewerClick);
+
+        infobox = new Infobox(moleculeView);
+        content.append(infobox);
+
+        scroller.setChild(content);
         setChild(scroller);
 
+        // TODO: Nav pane.
         Button homeBtn = new Button();
         homeBtn.iconName = "go-home-symbolic";
         homeBtn.tooltipText = "Back to home";
         homeBtn.addCssClass("home-button");
-        homeBtn.connectClicked(&onHomeClicked);
+        homeBtn.connectClicked(() {
+            if (onGoHome !is null) onGoHome();
+        });
         homeBtn.widthRequest = 48;
         homeBtn.heightRequest = 48;
         homeBtn.halign = Align.End;
@@ -67,21 +86,52 @@ class ArticleView : Overlay
         homeBtn.marginBottom = 24;
 
         addOverlay(homeBtn);
+        buildOverlay();
     }
 
-    @property Infobox getInfobox()
+    private void buildOverlay()
     {
-        return infobox;
+        screenOverlay = new Overlay();
+        screenOverlay.hexpand = true;
+        screenOverlay.vexpand = true;
+        screenOverlay.visible = false;
+
+        Button closeBtn = new Button();
+        closeBtn.iconName = "window-close-symbolic";
+        closeBtn.tooltipText = "Close";
+        closeBtn.addCssClass("fullscreen-close");
+        closeBtn.connectClicked(&onCloseFullscreen);
+        closeBtn.widthRequest = 40;
+        closeBtn.heightRequest = 40;
+        closeBtn.halign = Align.End;
+        closeBtn.valign = Align.Start;
+        closeBtn.marginTop = 12;
+        closeBtn.marginEnd = 12;
+
+        screenOverlay.addOverlay(closeBtn);
+        addOverlay(screenOverlay);
     }
 
-    void setPlaceholder(string text)
+    private void onCloseFullscreen()
     {
-        placeholderLabel.label = text;
+        screenOverlay.setChild(null);
+        screenOverlay.visible = false;
+
+        infobox.setupMView();
     }
 
-    private void onHomeClicked()
+    void onViewerClicked()
     {
-        if (onGoHome !is null)
-            onGoHome();
+        if (infobox.compound is null || screenOverlay.getChild() is moleculeView)
+            return;
+
+        infobox.subject.remove(moleculeView);
+        moleculeView.hexpand = true;
+        moleculeView.vexpand = true;
+        moleculeView.setBaseZoom(40.0);
+        moleculeView.enableMotionControl();
+        
+        screenOverlay.setChild(moleculeView);
+        screenOverlay.visible = true;
     }
 }

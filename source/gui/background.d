@@ -32,12 +32,16 @@ class Background : DrawingArea
     private double minAlpha = 0.15;
     private double maxAlpha = 0.35;
     private string cssClass = "homepage-background";
-    private bool paintBase = true;
 
-    this(int maxSplotches = 40, int msPerFrame = 100, double spawnMargin = 50.0,
-         double minRadius = 30.0, double maxRadius = 120.0,
-         double minAlpha = 0.15, double maxAlpha = 0.35,
-         string cssClass = "homepage-background", bool paintBase = true)
+    this(int maxSplotches = 40, 
+        int msPerFrame = 100, 
+        double spawnMargin = 50.0,
+        double minRadius = 30.0, 
+        double maxRadius = 120.0,
+        double minAlpha = 0.15, 
+        double maxAlpha = 0.35,
+        string cssClass = "homepage-background"
+    )
     {
         this.maxSplotches = maxSplotches;
         this.msPerFrame = msPerFrame;
@@ -47,9 +51,7 @@ class Background : DrawingArea
         this.minAlpha = minAlpha;
         this.maxAlpha = maxAlpha;
         this.cssClass = cssClass;
-        this.paintBase = paintBase;
-        
-        rng = Random(unpredictableSeed);
+        this.rng = Random(unpredictableSeed);
         
         setDrawFunc(&drawBackground);
         addCssClass(this.cssClass);
@@ -79,27 +81,42 @@ class Background : DrawingArea
         s.y = uniform(-spawnMargin, height + spawnMargin, rng);
         s.radius = uniform(minRadius, maxRadius, rng);
 
-        // Random color from a palette (navy, baby blue, cyan, teal, soft purple)
-        int colorChoice = uniform(0, 5, rng);
-        switch (colorChoice)
+        switch (uniform(0, 5, rng))
         {
-            case 0: // Navy
-                s.r = 0.0; s.g = 0.2; s.b = 0.4;
+            // Navy
+            case 0:
+                s.r = 0.0; 
+                s.g = 0.2; 
+                s.b = 0.4;
                 break;
-            case 1: // Baby blue
-                s.r = 0.70; s.g = 0.85; s.b = 1.0;
+            // Baby blue
+            case 1:
+                s.r = 0.70; 
+                s.g = 0.85; 
+                s.b = 1.0;
                 break;
-            case 2: // Cyan
-                s.r = 0.4; s.g = 0.8; s.b = 1.0;
+            // Cyan
+            case 2:
+                s.r = 0.4; 
+                s.g = 0.8; 
+                s.b = 1.0;
                 break;
-            case 3: // Teal
-                s.r = 0.2; s.g = 0.6; s.b = 0.7;
+            // Teal
+            case 3:
+                s.r = 0.2; 
+                s.g = 0.6; 
+                s.b = 0.7;
                 break;
-            case 4: // Soft purple-blue
-                s.r = 0.5; s.g = 0.6; s.b = 0.9;
+            // Soft purple-blue
+            case 4:
+                s.r = 0.5; 
+                s.g = 0.6; 
+                s.b = 0.9;
                 break;
             default:
-                s.r = 0.70; s.g = 0.85; s.b = 1.0;
+                s.r = 0.70; 
+                s.g = 0.85; 
+                s.b = 1.0;
         }
 
         s.alpha = uniform(minAlpha, maxAlpha, rng);
@@ -110,7 +127,7 @@ class Background : DrawingArea
 
     private void drawBlob(Context cr, double cx, double cy, double baseRadius, int seed)
     {
-        // Create irregular blob shape using multiple sine waves around circle
+        // Create irregular blob shape using multiple sine waves around circle.
         int points = 32;
         double[32] angles;
         double[32] radii;
@@ -119,7 +136,7 @@ class Background : DrawingArea
         {
             angles[i] = i * 2.0 * PI / points;
 
-            // Multiple overlapping sine waves for irregular edge
+            // Multiple overlapping sine waves for irregular edge.
             double variation = 0;
             variation += sin(angles[i] * 3 + seed * 0.1) * 0.15;
             variation += cos(angles[i] * 5 + seed * 0.2) * 0.10;
@@ -129,7 +146,7 @@ class Background : DrawingArea
             radii[i] = baseRadius * (1.0 + variation);
         }
 
-        // Draw smooth curve through points
+        // Draw smooth curve through points.
         cr.moveTo(cx + radii[0] * cos(angles[0]), cy + radii[0] * sin(angles[0]));
 
         foreach (i; 0..points)
@@ -137,19 +154,27 @@ class Background : DrawingArea
             int next = (i + 1) % points;
             int next2 = (i + 2) % points;
 
-            // Control points for smooth bezier
-            double cp1x = cx + radii[i] * cos(angles[i]) + 
-                         (radii[next] * cos(angles[next]) - radii[i] * cos(angles[i])) * 0.3;
-            double cp1y = cy + radii[i] * sin(angles[i]) + 
-                         (radii[next] * sin(angles[next]) - radii[i] * sin(angles[i])) * 0.3;
+            // Control points for smooth bezier.
+            double[2] cp1 = [
+                cx + radii[i] * cos(angles[i]) + 
+                        (radii[next] * cos(angles[next]) - radii[i] * cos(angles[i])) * 0.3,
+                cy + radii[i] * sin(angles[i]) + 
+                        (radii[next] * sin(angles[next]) - radii[i] * sin(angles[i])) * 0.3
+            ];
 
-            double cp2x = cx + radii[next] * cos(angles[next]) - 
-                         (radii[next2] * cos(angles[next2]) - radii[next] * cos(angles[next])) * 0.3;
-            double cp2y = cy + radii[next] * sin(angles[next]) - 
-                         (radii[next2] * sin(angles[next2]) - radii[next] * sin(angles[next])) * 0.3;
+            double[2] cp2 = [
+                cx + radii[next] * cos(angles[next]) - 
+                        (radii[next2] * cos(angles[next2]) - radii[next] * cos(angles[next])) * 0.3,
+                cy + radii[next] * sin(angles[next]) - 
+                        (radii[next2] * sin(angles[next2]) - radii[next] * sin(angles[next])) * 0.3
+            ];
 
-            cr.curveTo(cp1x, cp1y, cp2x, cp2y, 
-                      cx + radii[next] * cos(angles[next]), cy + radii[next] * sin(angles[next]));
+            cr.curveTo(
+                cp1[0], cp1[1], 
+                cp2[0], cp2[1], 
+                cx + radii[next] * cos(angles[next]), 
+                cy + radii[next] * sin(angles[next])
+            );
         }
 
         cr.closePath();
@@ -157,14 +182,9 @@ class Background : DrawingArea
 
     private void drawBackground(DrawingArea, Context cr, int width, int height)
     {
-        if (paintBase)
-        {
-            // White base
-            cr.setSourceRgb(1.0, 1.0, 1.0);
-            cr.paint();
-        }
+        cr.setSourceRgb(1.0, 1.0, 1.0);
+        cr.paint();
 
-        // Draw all splotches with blending
         foreach (splotch; splotches)
         {
             cr.setSourceRgba(splotch.r, splotch.g, splotch.b, splotch.alpha);

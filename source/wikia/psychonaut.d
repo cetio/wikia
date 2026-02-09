@@ -157,11 +157,11 @@ struct DosageResult
 
 DosageResult getDosage(Compound compound)
 {
-    Dosage[] tryParseDosage(string pageTitle)
+    Dosage[] tryParseDosage(string title)
     {
         JSONValue json = query([
             "action": "parse", "prop": "wikitext",
-            "page": "Template:SubstanceBox/"~pageTitle
+            "page": "Template:SubstanceBox/"~title
         ]);
         if ("parse" !in json || "wikitext" !in json["parse"])
             return [];
@@ -179,9 +179,9 @@ DosageResult getDosage(Compound compound)
         return parseDosageText(raw);
     }
 
-    bool isExactPage(string pageTitle, string[] syns)
+    bool isExactPage(string title, string[] syns)
     {
-        string lower = pageTitle.toLower;
+        string lower = title.toLower;
         foreach (syn; syns)
         {
             if (syn.toLower == lower)

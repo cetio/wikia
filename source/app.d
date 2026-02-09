@@ -25,23 +25,25 @@ import gtk.types : Orientation, Align, PolicyType, STYLE_PROVIDER_PRIORITY_APPLI
 import wikia.pubchem;
 import wikia.psychonaut : DosageResult, getDosage;
 
-import gui.background : Background;
-import gui.home : Homepage;
-import gui.article : ArticleView, Infobox, MoleculeViewer;
+import gui.background;
+import gui.home;
+import gui.article;
+import gui.conformer.view;
 
 immutable string cssPath = "resources/style.css";
 
 class WikiaWindow : gtk.application_window.ApplicationWindow
 {
-    private Homepage homepage;
-    private ArticleView articleView;
-    private Compound lastSearchCompound;
-    private Box fullscreenBox;
-    private MoleculeViewer fullscreenViewer;
-    private Overlay windowOverlay;
-    private Stack contentStack;
-    private Label titleLabel;
+private:
+    Stack stack;
+    Homepage homepage;
+    ArticleView article;
 
+    Compound lastSearchCompound;
+    Overlay windowOverlay;
+    Label titleLabel;
+
+public:
     this(gtk.application.Application app)
     {
         super(app);
@@ -58,83 +60,31 @@ class WikiaWindow : gtk.application_window.ApplicationWindow
         windowOverlay.hexpand = true;
         windowOverlay.vexpand = true;
 
-        contentStack = new Stack();
-        contentStack.hexpand = true;
-        contentStack.vexpand = true;
+        stack = new Stack();
+        stack.hexpand = true;
+        stack.vexpand = true;
 
         homepage = new Homepage();
         homepage.onSearch = &doSearch;
         homepage.onCompoundSelected = &onCompoundSelected;
-        contentStack.addNamed(homepage, "homepage");
+        stack.addNamed(homepage, "homepage");
 
-        articleView = new ArticleView();
-        articleView.onGoHome = &showHome;
-        articleView.getInfobox().onViewerClick = &onMoleculeViewerClick;
-        contentStack.addNamed(articleView, "article");
+        article = new ArticleView();
+        article.onGoHome = &showHome;
+        stack.addNamed(article, "article");
 
-        contentStack.visibleChildName = "homepage";
+        stack.visibleChildName = "homepage";
 
-        Box rootBox = new Box(Orientation.Vertical, 0);
-        rootBox.addCssClass("root-container");
-        rootBox.hexpand = true;
-        rootBox.vexpand = true;
-        rootBox.append(contentStack);
-        windowOverlay.setChild(rootBox);
+        Box root = new Box(Orientation.Vertical, 0);
+        root.addCssClass("root-container");
+        root.hexpand = true;
+        root.vexpand = true;
+        root.append(stack);
+        windowOverlay.setChild(root);
 
-        buildFullscreenOverlay();
         setChild(windowOverlay);
     }
 
-    private void buildFullscreenOverlay()
-    {
-        fullscreenBox = new Box(Orientation.Vertical, 0);
-        fullscreenBox.addCssClass("fullscreen-bg");
-        fullscreenBox.hexpand = true;
-        fullscreenBox.vexpand = true;
-        fullscreenBox.visible = false;
-
-        fullscreenViewer = new MoleculeViewer();
-        fullscreenViewer.hexpand = true;
-        fullscreenViewer.vexpand = true;
-
-        Button closeBtn = new Button();
-        closeBtn.iconName = "window-close-symbolic";
-        closeBtn.tooltipText = "Close";
-        closeBtn.addCssClass("fullscreen-close");
-        closeBtn.connectClicked(&onCloseFullscreen);
-        closeBtn.widthRequest = 40;
-        closeBtn.heightRequest = 40;
-        closeBtn.halign = Align.End;
-        closeBtn.valign = Align.Start;
-        closeBtn.marginTop = 12;
-        closeBtn.marginEnd = 12;
-
-        Overlay viewerOverlay = new Overlay();
-        viewerOverlay.setChild(fullscreenViewer);
-        viewerOverlay.addOverlay(closeBtn);
-        viewerOverlay.hexpand = true;
-        viewerOverlay.vexpand = true;
-
-        fullscreenBox.append(viewerOverlay);
-        windowOverlay.addOverlay(fullscreenBox);
-    }
-
-    private void onCloseFullscreen()
-    {
-        fullscreenBox.visible = false;
-    }
-
-    private void onMoleculeViewerClick()
-    {
-        if (lastSearchCompound !is null 
-            && lastSearchCompound.conformer3D !is null 
-            && lastSearchCompound.conformer3D.isValid())
-        {
-            fullscreenViewer.setConformer(lastSearchCompound.conformer3D);
-            fullscreenViewer.setBackgroundName(lastSearchCompound.name);
-            fullscreenBox.visible = true;
-        }
-    }
 
     private void doSearch(string query)
     {
@@ -191,9 +141,9 @@ class WikiaWindow : gtk.application_window.ApplicationWindow
         }
 
         lastSearchCompound = compound;
-        articleView.getInfobox().update(compound);
+        article.infobox.update(compound);
+        article.infobox.showLoading();
         showArticle();
-        articleView.getInfobox().showLoading();
 
         Thread dosageThread = new Thread({
             try
@@ -202,7 +152,7 @@ class WikiaWindow : gtk.application_window.ApplicationWindow
                 DosageResult dosage = getDosage(compound);
                 writeln("[App] Dosage dosage: ", dosage.dosages.length,
                     " routes, source=", dosage.source ? dosage.source.name : "primary");
-                articleView.getInfobox().setDosage(dosage);
+                article.infobox.setDosage(dosage);
             }
             catch (Exception e)
                 writeln("[App] Dosage fetch failed: ", e.msg);
@@ -214,15 +164,15 @@ class WikiaWindow : gtk.application_window.ApplicationWindow
 
     private void showArticle()
     {
-        contentStack.visibleChildName = "article";
+        stack.visibleChildName = "article";
     }
 
     private void showHome()
     {
         titleLabel.label = "Wikia";
-        contentStack.visibleChildName = "homepage";
+        stack.visibleChildName = "homepage";
         lastSearchCompound = null;
-        articleView.getInfobox().reset();
+        article.infobox.reset();
         homepage.clearResults();
     }
 
@@ -230,15 +180,11 @@ class WikiaWindow : gtk.application_window.ApplicationWindow
 
 class WikiaApp : gtk.application.Application
 {
-    private CssProvider cssProvider;
+private:
+    CssProvider cssProvider;
 
-    this()
-    {
-        super("org.wikia.pubchem", ApplicationFlags.DefaultFlags);
-        connectActivate(&onActivate);
-    }
 
-    private void applyCss()
+    void applyCss()
     {
         cssProvider = new CssProvider();
         if (cssPath.exists)
@@ -253,11 +199,18 @@ class WikiaApp : gtk.application.Application
         StyleContext.addProviderForDisplay(display, cssProvider, STYLE_PROVIDER_PRIORITY_APPLICATION);
     }
 
-    private void onActivate()
+    void onActivate()
     {
         applyCss();
         WikiaWindow window = new WikiaWindow(this);
         window.present();
+    }
+
+public:
+    this()
+    {
+        super("org.wikia.pubchem", ApplicationFlags.DefaultFlags);
+        connectActivate(&onActivate);
     }
 }
 

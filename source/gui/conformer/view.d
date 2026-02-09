@@ -1,8 +1,9 @@
-module gui.article.viewer;
+module gui.conformer.view;
+
+import std.math : abs;
 
 import cairo.context : Context;
 import cairo.types : TextExtents;
-
 import gtk.drawing_area;
 import gtk.event_controller_motion;
 import gtk.event_controller_scroll;
@@ -13,12 +14,12 @@ import gui.conformer.camera : Camera;
 import gui.conformer.hit : HitResult, hitTest;
 import gui.conformer.render;
 
+import wikia.pubchem.compound : Compound;
 import wikia.pubchem.conformer3d;
 
-class MoleculeViewer : DrawingArea
+class MoleculeView : DrawingArea
 {
-    private:
-
+package:
     struct HoverState
     {
         int atomId = -1;
@@ -37,16 +38,17 @@ class MoleculeViewer : DrawingArea
         }
     }
 
-    Conformer3D conformer;
+    Compound compound;
     Camera camera;
     HoverState hover;
+    double dragStartRotX;
+    double dragStartRotY;
+    bool motionControl;
+
     void delegate() onClick;
-    string backgroundName;
-    double dragStartRotX, dragStartRotY;
 
-    public:
-
-    this(bool enableDrag = true)
+public:
+    this()
     {
         addCssClass("molecule-viewer");
         setContentWidth(400);
@@ -56,13 +58,10 @@ class MoleculeViewer : DrawingArea
 
         setDrawFunc(&onDraw);
 
-        if (enableDrag)
-        {
-            auto dragGesture = new gtk.gesture_drag.GestureDrag();
-            dragGesture.connectDragBegin(&onDragBegin);
-            dragGesture.connectDragUpdate(&onDragUpdate);
-            addController(dragGesture);
-        }
+        auto dragGesture = new gtk.gesture_drag.GestureDrag();
+        dragGesture.connectDragBegin(&onDragBegin);
+        dragGesture.connectDragUpdate(&onDragUpdate);
+        addController(dragGesture);
 
         auto scrollController = new gtk.event_controller_scroll.EventControllerScroll(
             EventControllerScrollFlags.Vertical
@@ -76,23 +75,23 @@ class MoleculeViewer : DrawingArea
         addController(motionController);
     }
 
-    void setBackgroundName(string name)
+    bool enableMotionControl()
+        => motionControl = true;
+    
+    bool disableMotionControl()
+        => motionControl = false;
+    
+    void setCompound(Compound compound)
     {
-        backgroundName = name;
-        queueDraw();
-    }
-
-    void setConformer(Conformer3D conf)
-    {
-        conformer = conf;
+        this.compound = compound;
         hover.clear();
         queueDraw();
     }
 
-    void setBaseZoom(double z)
+    void setBaseZoom(double val)
     {
-        camera.baseZoom = z;
-        camera.zoom = z;
+        camera.baseZoom = val;
+        camera.zoom = val;
         queueDraw();
     }
 
@@ -102,28 +101,42 @@ class MoleculeViewer : DrawingArea
         queueDraw();
     }
 
-    private void onDragBegin()
+private:
+    void onDragBegin()
     {
+        if (!motionControl)
+            return;
+        
         dragStartRotX = camera.rotationX;
         dragStartRotY = camera.rotationY;
     }
 
-    private void onDragUpdate(double x, double y)
+    void onDragUpdate(double x, double y)
     {
+        if (!motionControl)
+            return;
+        
         camera.rotationY = dragStartRotY + x * 0.01;
         camera.rotationX = dragStartRotX + y * 0.01;
         queueDraw();
     }
 
-    private bool onScroll(double dx, double dy)
+    bool onScroll(double dx, double dy)
     {
+        if (!motionControl)
+            return false;
+        
         camera.zoomBy(1.0 - dy * 0.1);
         queueDraw();
         return true;
     }
 
-    private void onMotion(double x, double y)
+    void onMotion(double x, double y)
     {
+        if (!motionControl)
+            return;
+        
+        Conformer3D conformer = compound.conformer3D;
         if (conformer is null || !conformer.isValid())
         {
             hover.clear();
@@ -168,15 +181,18 @@ class MoleculeViewer : DrawingArea
         }
     }
 
-    private void onLeave()
+    void onLeave()
     {
+        if (!motionControl)
+            return;
+        
         hover.clear();
         queueDraw();
     }
 
-
-    private string formatBondTooltip(Bond3D bond)
+    string formatBondTooltip(Bond3D bond)
     {
+        Conformer3D conformer = compound.conformer3D;
         int idx1 = conformer.indexOf(bond.aid1);
         int idx2 = conformer.indexOf(bond.aid2);
 
@@ -188,25 +204,47 @@ class MoleculeViewer : DrawingArea
         return conformer.atoms[idx1].element.name~"-"~conformer.atoms[idx2].element.name~" "~bondType;
     }
 
-    private void onDraw(DrawingArea, Context cr, int width, int height)
+    void onDraw(DrawingArea, Context cr, int width, int height)
     {
         drawBackground(cr);
-
-        drawBackgroundText(cr, backgroundName, width, height);
-
         drawGrid(cr, width, height);
-
-        if (conformer is null || !conformer.isValid())
-        {
-            drawPlaceholder(cr, width, height);
-            return;
-        }
-
-        drawMolecule(cr, conformer, camera, width, height, hover.atomId, hover.bondIdx);
-
-        drawInfoText(cr, cast(int)conformer.atoms.length, cast(int)conformer.bonds.length, width, height);
+        drawBackgroundText(
+            cr, 
+            compound.name, 
+            width, 
+            height
+        );
 
         if (hover.tooltip !is null)
-            drawTooltip(cr, hover.tooltip, hover.x, hover.y, width, height);
+        {
+            drawTooltip(
+                cr, 
+                hover.tooltip, 
+                hover.x, 
+                hover.y, 
+                width, 
+                height
+            );
+        }
+
+        if (compound.conformer3D is null || !compound.conformer3D.isValid())
+            return;
+
+        drawMolecule(
+            cr, 
+            compound.conformer3D, 
+            camera, 
+            width, 
+            height, 
+            hover.atomId, 
+            hover.bondIdx
+        );
+
+        drawInfoText(
+            cr, 
+            cast(int)compound.conformer3D.atoms.length, 
+            cast(int)compound.conformer3D.bonds.length, 
+            height
+        );
     }
 }

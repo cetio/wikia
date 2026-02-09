@@ -17,46 +17,15 @@ import wikia.pubchem;
 
 class Homepage : Box
 {
-    private SearchEntry searchEntry;
-    private ListBox suggestionList;
-    private Box loadingDots;
-    private Compound[] pendingSimilarCompounds;
-    private bool isLoading;
-    private Compound lastSearchCompound;
+private:
+    SearchEntry searchEntry;
+    ListBox suggestionList;
+    Box loadingDots;
+    Compound[] pendingSimilarCompounds;
+    bool isLoading;
+    Compound lastSearchCompound;
 
-    void delegate(string query) onSearch;
-    void delegate(int index, Compound compound) onCompoundSelected;
-
-    this()
-    {
-        super(Orientation.Vertical, 0);
-        writeln("[Homepage] Constructor started");
-        
-        Overlay overlay = new Overlay();
-        overlay.hexpand = true;
-        overlay.vexpand = true;
-
-        Background bg = new Background();
-        bg.hexpand = true;
-        bg.vexpand = true;
-        bg.addCssClass("homepage-background");
-        overlay.setChild(bg);
-
-        Box centeringBox = new Box(Orientation.Vertical, 0);
-        centeringBox.hexpand = true;
-        centeringBox.vexpand = true;
-        centeringBox.halign = Align.Center;
-        centeringBox.valign = Align.Center;
-
-        Box content = buildContent();
-        centeringBox.append(content);
-        overlay.addOverlay(centeringBox);
-
-        append(overlay);
-        writeln("[Homepage] Constructor completed");
-    }
-
-    private Box buildContent()
+    Box buildContent()
     {
         Box content = new Box(Orientation.Vertical, 0);
         content.addCssClass("homepage-content");
@@ -90,7 +59,7 @@ class Homepage : Box
         return content;
     }
 
-    private Box buildLogo()
+    Box buildLogo()
     {
         Box logoBox = new Box(Orientation.Horizontal, 0);
         logoBox.halign = Align.Center;
@@ -107,7 +76,7 @@ class Homepage : Box
         return logoBox;
     }
 
-    private Label buildTagline()
+    Label buildTagline()
     {
         Label tagline = new Label("The free chemical compound database");
         tagline.addCssClass("homepage-tagline");
@@ -115,7 +84,7 @@ class Homepage : Box
         return tagline;
     }
 
-    private Box buildSearch()
+    Box buildSearch()
     {
         Box searchBox = new Box(Orientation.Horizontal, 0);
         searchBox.addCssClass("homepage-search-box");
@@ -139,7 +108,7 @@ class Homepage : Box
         return searchBox;
     }
 
-    private Box buildLinks()
+    Box buildLinks()
     {
         Box linksBox = new Box(Orientation.Horizontal, 16);
         linksBox.addCssClass("homepage-links");
@@ -153,14 +122,224 @@ class Homepage : Box
         linksBox.append(linkText);
         linksBox.append(pubchemLink);
         return linksBox;
+    }    
+
+    void updatePrimaryResultCompletion()
+    {
+        if (suggestionList.getFirstChild() !is null)
+        {
+            auto primaryRow = cast(ListBoxRow)suggestionList.getFirstChild();
+            if (primaryRow !is null)
+            {
+                auto compound = lastSearchCompound;
+                if (compound !is null)
+                    primaryRow.setChild(buildResultRow(compound, true, false));
+            }
+        }
     }
 
-    @property SearchEntry getSearchEntry()
+    void showLoadingDots()
+    {
+        if (!isLoading) return;
+        
+        loadingDots = new Box(Orientation.Horizontal, 4);
+        loadingDots.addCssClass("loading-dots");
+        loadingDots.halign = Align.Center;
+        
+        auto dot1 = new Label(".");
+        dot1.addCssClass("dot");
+        auto dot2 = new Label(".");
+        dot2.addCssClass("dot");
+        auto dot3 = new Label(".");
+        dot3.addCssClass("dot");
+        
+        loadingDots.append(dot1);
+        loadingDots.append(dot2);
+        loadingDots.append(dot3);
+        
+        suggestionList.append(loadingDots);
+        loadingDots.visible = true;
+    }
+    
+    void hideLoadingDots()
+    {
+        if (loadingDots !is null)
+        {
+            suggestionList.remove(loadingDots);
+            loadingDots = null;
+        }
+    }
+
+    void appendHeader(string text)
+    {
+        ListBoxRow headerRow = new ListBoxRow();
+        headerRow.selectable = false;
+        Label headerLabel = new Label(text);
+        headerLabel.addCssClass("search-results-header");
+        headerLabel.halign = Align.Start;
+        headerRow.setChild(headerLabel);
+        suggestionList.append(headerRow);
+    }
+
+    Box buildResultRow(string cid)
+    {
+        Box rowBox = new Box(Orientation.Vertical, 4);
+        rowBox.addCssClass("search-result-row");
+
+        Label titleLabel = new Label("CID "~cid);
+        titleLabel.addCssClass("search-result-title");
+        titleLabel.halign = Align.Start;
+
+        Label detailLabel = new Label("PubChem");
+        detailLabel.addCssClass("search-result-detail");
+        detailLabel.halign = Align.Start;
+
+        rowBox.append(titleLabel);
+        rowBox.append(detailLabel);
+        return rowBox;
+    }
+
+    Box buildResultRow(Compound compound, bool isPrimary = false, bool isLoading = false)
+    {
+        Box rowBox = new Box(Orientation.Horizontal, 8);
+        rowBox.addCssClass("search-result-row");
+        if (!isPrimary)
+            rowBox.addCssClass("similar-result");
+
+        if (isPrimary && isLoading)
+        {
+            auto dotsBox = new Box(Orientation.Horizontal, 1);
+            dotsBox.addCssClass("loading-dots");
+            dotsBox.valign = Align.Center;
+            
+            auto dot1 = new Label(".");
+            dot1.addCssClass("dot");
+            auto dot2 = new Label(".");
+            dot2.addCssClass("dot");
+            auto dot3 = new Label(".");
+            dot3.addCssClass("dot");
+            
+            dotsBox.append(dot1);
+            dotsBox.append(dot2);
+            dotsBox.append(dot3);
+            
+            rowBox.append(dotsBox);
+        }
+        
+        auto titleBox = new Box(Orientation.Vertical, 2);
+        auto titleLabel = new Label(compound.name);
+        titleLabel.addCssClass("search-result-title");
+        titleLabel.halign = Align.Start;
+        titleBox.append(titleLabel);
+        
+        rowBox.append(titleBox);
+        rowBox.hexpand = true;
+        
+        auto sourceLabel = new Label("["~compound.cid.to!string~"]");
+        sourceLabel.addCssClass("search-result-detail");
+        sourceLabel.halign = Align.End;
+        rowBox.append(sourceLabel);
+        
+        auto pubchemLabel = new Label("PubChem");
+        pubchemLabel.addCssClass("search-result-detail");
+        pubchemLabel.halign = Align.End;
+        pubchemLabel.marginStart = 8;
+        rowBox.append(pubchemLabel);
+
+        return rowBox;
+    }
+
+    void onSearchBtnClicked()
+    {
+        string text = searchEntry.text;
+        if (text.length >= 2 && onSearch !is null)
+            onSearch(text);
+    }
+
+    void onSearchActivated()
+    {
+        string text = searchEntry.text;
+        if (text.length < 2)
+        {
+            suggestionList.visible = false;
+            suggestionList.removeAll();
+            return;
+        }
+        if (onSearch !is null)
+            onSearch(text);
+    }
+
+    void onRowActivated(ListBoxRow row)
+    {
+        writeln("[Homepage] onRowActivated called");
+        if (row is null)
+        {
+            writeln("[Homepage] Row is null");
+            return;
+        }
+
+        int index = row.getIndex();
+        writeln("[Homepage] Row activated, index: ", index);
+        
+        void* similarData = row.getData("similar-compound");
+        if (similarData !is null)
+        {
+            auto similarCompound = cast(Compound)similarData;
+            if (similarCompound !is null && onCompoundSelected !is null)
+            {
+                writeln("[Homepage] Similar compound selected: CID ", similarCompound.cid);
+                onCompoundSelected(index, similarCompound);
+                return;
+            }
+        }
+        
+        // Primary result selected (index 0)
+        if (index == 0 && lastSearchCompound !is null && onCompoundSelected !is null)
+        {
+            writeln("[Homepage] Primary result selected");
+            onCompoundSelected(index, lastSearchCompound);
+        }
+    }
+
+public:
+    void delegate(string query) onSearch;
+    void delegate(int index, Compound compound) onCompoundSelected;
+
+    this()
+    {
+        super(Orientation.Vertical, 0);
+        writeln("[Homepage] Constructor started");
+        
+        Overlay overlay = new Overlay();
+        overlay.hexpand = true;
+        overlay.vexpand = true;
+
+        Background bg = new Background();
+        bg.hexpand = true;
+        bg.vexpand = true;
+        bg.addCssClass("homepage-background");
+        overlay.setChild(bg);
+
+        Box centering = new Box(Orientation.Vertical, 0);
+        centering.hexpand = true;
+        centering.vexpand = true;
+        centering.halign = Align.Center;
+        centering.valign = Align.Center;
+
+        Box content = buildContent();
+        centering.append(content);
+        overlay.addOverlay(centering);
+
+        append(overlay);
+        writeln("[Homepage] Constructor completed");
+    }
+
+    SearchEntry getSearchEntry()
     {
         return searchEntry;
     }
 
-    @property ListBox getSuggestionList()
+    ListBox getSuggestionList()
     {
         return suggestionList;
     }
@@ -186,52 +365,6 @@ class Homepage : Box
         updatePrimaryResultCompletion();
         
         writeln("[Homepage] addSimilarResults completed");
-    }
-    
-    private void updatePrimaryResultCompletion()
-    {
-        if (suggestionList.getFirstChild() !is null)
-        {
-            auto primaryRow = cast(ListBoxRow)suggestionList.getFirstChild();
-            if (primaryRow !is null)
-            {
-                auto compound = lastSearchCompound;
-                if (compound !is null)
-                    primaryRow.setChild(buildResultRow(compound, true, false));
-            }
-        }
-    }
-    
-    private void showLoadingDots()
-    {
-        if (!isLoading) return;
-        
-        loadingDots = new Box(Orientation.Horizontal, 4);
-        loadingDots.addCssClass("loading-dots");
-        loadingDots.halign = Align.Center;
-        
-        auto dot1 = new Label(".");
-        dot1.addCssClass("dot");
-        auto dot2 = new Label(".");
-        dot2.addCssClass("dot");
-        auto dot3 = new Label(".");
-        dot3.addCssClass("dot");
-        
-        loadingDots.append(dot1);
-        loadingDots.append(dot2);
-        loadingDots.append(dot3);
-        
-        suggestionList.append(loadingDots);
-        loadingDots.visible = true;
-    }
-    
-    private void hideLoadingDots()
-    {
-        if (loadingDots !is null)
-        {
-            suggestionList.remove(loadingDots);
-            loadingDots = null;
-        }
     }
 
     void clearResults()
@@ -335,136 +468,5 @@ class Homepage : Box
 
         suggestionList.visible = true;
         writeln("[Homepage] displayResults completed");
-    }
-
-    private void appendHeader(string text)
-    {
-        ListBoxRow headerRow = new ListBoxRow();
-        headerRow.selectable = false;
-        Label headerLabel = new Label(text);
-        headerLabel.addCssClass("search-results-header");
-        headerLabel.halign = Align.Start;
-        headerRow.setChild(headerLabel);
-        suggestionList.append(headerRow);
-    }
-
-    private Box buildResultRow(string cid)
-    {
-        Box rowBox = new Box(Orientation.Vertical, 4);
-        rowBox.addCssClass("search-result-row");
-
-        Label titleLabel = new Label("CID "~cid);
-        titleLabel.addCssClass("search-result-title");
-        titleLabel.halign = Align.Start;
-
-        Label detailLabel = new Label("PubChem");
-        detailLabel.addCssClass("search-result-detail");
-        detailLabel.halign = Align.Start;
-
-        rowBox.append(titleLabel);
-        rowBox.append(detailLabel);
-        return rowBox;
-    }
-
-    private Box buildResultRow(Compound compound, bool isPrimary = false, bool isLoading = false)
-    {
-        auto rowBox = new Box(Orientation.Horizontal, 8);
-        rowBox.addCssClass("search-result-row");
-        if (!isPrimary)
-            rowBox.addCssClass("similar-result");
-
-        if (isPrimary && isLoading)
-        {
-            auto dotsBox = new Box(Orientation.Horizontal, 1);
-            dotsBox.addCssClass("loading-dots");
-            dotsBox.valign = Align.Center;
-            
-            auto dot1 = new Label(".");
-            dot1.addCssClass("dot");
-            auto dot2 = new Label(".");
-            dot2.addCssClass("dot");
-            auto dot3 = new Label(".");
-            dot3.addCssClass("dot");
-            
-            dotsBox.append(dot1);
-            dotsBox.append(dot2);
-            dotsBox.append(dot3);
-            
-            rowBox.append(dotsBox);
-        }
-        
-        auto titleBox = new Box(Orientation.Vertical, 2);
-        auto titleLabel = new Label(compound.name);
-        titleLabel.addCssClass("search-result-title");
-        titleLabel.halign = Align.Start;
-        titleBox.append(titleLabel);
-        
-        rowBox.append(titleBox);
-        rowBox.hexpand = true;
-        
-        auto sourceLabel = new Label("["~compound.cid.to!string~"]");
-        sourceLabel.addCssClass("search-result-detail");
-        sourceLabel.halign = Align.End;
-        rowBox.append(sourceLabel);
-        
-        auto pubchemLabel = new Label("PubChem");
-        pubchemLabel.addCssClass("search-result-detail");
-        pubchemLabel.halign = Align.End;
-        pubchemLabel.marginStart = 8;
-        rowBox.append(pubchemLabel);
-
-        return rowBox;
-    }
-
-    private void onSearchBtnClicked()
-    {
-        string text = searchEntry.text;
-        if (text.length >= 2 && onSearch !is null)
-            onSearch(text);
-    }
-
-    private void onSearchActivated()
-    {
-        string text = searchEntry.text;
-        if (text.length < 2)
-        {
-            suggestionList.visible = false;
-            suggestionList.removeAll();
-            return;
-        }
-        if (onSearch !is null)
-            onSearch(text);
-    }
-
-    private void onRowActivated(ListBoxRow row)
-    {
-        writeln("[Homepage] onRowActivated called");
-        if (row is null)
-        {
-            writeln("[Homepage] Row is null");
-            return;
-        }
-
-        int index = row.getIndex();
-        writeln("[Homepage] Row activated, index: ", index);
-        
-        void* similarData = row.getData("similar-compound");
-        if (similarData !is null)
-        {
-            auto similarCompound = cast(Compound)similarData;
-            if (similarCompound !is null && onCompoundSelected !is null)
-            {
-                writeln("[Homepage] Similar compound selected: CID ", similarCompound.cid);
-                onCompoundSelected(index, similarCompound);
-                return;
-            }
-        }
-        
-        // Primary result selected (index 0)
-        if (index == 0 && lastSearchCompound !is null && onCompoundSelected !is null)
-        {
-            writeln("[Homepage] Primary result selected");
-            onCompoundSelected(index, lastSearchCompound);
-        }
     }
 }

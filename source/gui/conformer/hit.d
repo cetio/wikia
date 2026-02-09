@@ -2,7 +2,7 @@ module gui.conformer.hit;
 
 import std.math;
 import std.algorithm;
-import gui.conformer.camera : Camera;
+import gui.conformer.camera;
 import gui.conformer.render : getRadius;
 import wikia.pubchem.conformer3d;
 
@@ -33,10 +33,9 @@ HitResult hitTest(double mouseX, double mouseY, int width, int height, Conformer
 
     foreach (atom; conformer.atoms)
     {
-        double sx, sy;
-        cam.project(atom.x, atom.y, atom.z, sx, sy);
-
-        double dist = sqrt((sx - mx) * (sx - mx) + (sy - my) * (sy - my));
+        double[2] proj = cam.project(atom.x, atom.y, atom.z);
+        
+        double dist = sqrt((proj[0] - mx) * (proj[0] - mx) + (proj[1] - my) * (proj[1] - my));
         double radius = getRadius(atom.element) * cam.zoom * 0.3;
 
         if (dist <= radius && dist < closestAtomDist)
@@ -65,11 +64,10 @@ HitResult hitTest(double mouseX, double mouseY, int width, int height, Conformer
         if (idx1 < 0 || idx2 < 0)
             continue;
 
-        double sx1, sy1, sx2, sy2;
-        cam.project(conformer.atoms[idx1].x, conformer.atoms[idx1].y, conformer.atoms[idx1].z, sx1, sy1);
-        cam.project(conformer.atoms[idx2].x, conformer.atoms[idx2].y, conformer.atoms[idx2].z, sx2, sy2);
+        double[2] proj1 = cam.project(conformer.atoms[idx1].x, conformer.atoms[idx1].y, conformer.atoms[idx1].z);
+        double[2] proj2 = cam.project(conformer.atoms[idx2].x, conformer.atoms[idx2].y, conformer.atoms[idx2].z);
 
-        double dist = distanceToLineSegment(mx, my, sx1, sy1, sx2, sy2);
+        double dist = distanceToLineSegment(mx, my, proj1[0], proj1[1], proj2[0], proj2[1]);
         double bondWidth = bond.order == 1 ? 2.0 : (bond.order == 2 ? 3.0 : 4.0);
 
         if (dist <= bondWidth && dist < closestBondDist)

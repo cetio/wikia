@@ -8,36 +8,40 @@ import gtk.box;
 import gtk.event_controller_motion;
 import gtk.gesture_click;
 import gtk.label;
+import gtk.button;
 import gtk.overlay;
 import gtk.types : Align, Orientation;
 import gtk.widget : Widget;
 
-import gui.article.viewer;
+import gui.conformer.view;
 import gui.background : Background;
 import wikia.pubchem;
 import wikia.psychonaut : Dosage, DosageResult;
 
 class Infobox : Overlay
 {
-    private Label compoundNameLabel;
-    private Label cidLabel;
-    private Label formulaLabel;
-    private Label weightLabel;
-    private Label massLabel;
-    private Label chargeLabel;
-    private Label tpsaLabel;
-    private Label xlogpLabel;
-    private Label smilesLabel;
-    private MoleculeViewer moleculeViewer;
-    private Compound currentCompound;
-    private Box chemicalSection;
-    private Box dosageSection;
-    private Box loadingDotsBox;
-    private Box content;
+private:
+    Label titleLabel;
+    Label cidLabel;
+    Label formulaLabel;
+    Label weightLabel;
+    Label massLabel;
+    Label chargeLabel;
+    Label tpsaLabel;
+    Label xlogpLabel;
+    Label smilesLabel;
+    Label dosageLabel;
+    Box secChemical;
+    Box secDosage;
+    Box loadingDots;
 
-    void delegate() onViewerClick;
+public:
+    Box subject;
+    Box details;
+    Compound compound;
+    MoleculeView moleculeView;
 
-    this()
+    this(MoleculeView moleculeView)
     {
         super();
         addCssClass("infobox");
@@ -46,53 +50,49 @@ class Infobox : Overlay
         widthRequest = 80;
         hexpand = false;
 
-        content = new Box(Orientation.Vertical, 0);
-        content.addCssClass("infobox-content");
-        content.widthRequest = 240;
+        subject = new Box(Orientation.Vertical, 0);
+        subject.addCssClass("infobox-subject");
+        subject.heightRequest = 2;
 
-        compoundNameLabel = new Label("Select");
-        compoundNameLabel.addCssClass("infobox-title");
-        compoundNameLabel.wrap = true;
-        compoundNameLabel.maxWidthChars = 10;
-        compoundNameLabel.hexpand = true;
-        content.append(compoundNameLabel);
+        titleLabel = new Label("Unknown");
+        titleLabel.addCssClass("infobox-title");
+        titleLabel.wrap = true;
+        titleLabel.maxWidthChars = 10;
+        titleLabel.hexpand = true;
+        subject.append(titleLabel);
 
-        moleculeViewer = new MoleculeViewer(false);
-        moleculeViewer.setContentWidth(88);
-        moleculeViewer.setContentHeight(88);
-        moleculeViewer.setBaseZoom(10.0);
-        moleculeViewer.addCssClass("infobox-viewer-frame");
+        this.moleculeView = moleculeView;
+        moleculeView.setContentHeight(88);
+        moleculeView.setContentWidth(88);
+        setupMView();
 
-        GestureClick viewerClick = new GestureClick();
-        viewerClick.connectReleased(&onViewerClicked);
-        moleculeViewer.addController(viewerClick);
+        details = new Box(Orientation.Vertical, 0);
+        details.addCssClass("infobox-details");
+        details.widthRequest = 240;
 
-        content.append(moleculeViewer);
-
-        chemicalSection = new Box(Orientation.Vertical, 0);
-        chemicalSection.hexpand = true;
-        chemicalSection.halign = Align.Fill;
+        secChemical = new Box(Orientation.Vertical, 0);
+        secChemical.hexpand = true;
+        secChemical.halign = Align.Fill;
         cidLabel = new Label("--");
         formulaLabel = new Label("--");
-        smilesLabel = new Label("--");
         weightLabel = new Label("--");
         massLabel = new Label("--");
         chargeLabel = new Label("--");
         tpsaLabel = new Label("--");
         xlogpLabel = new Label("--");
+        smilesLabel = new Label("--");
         buildChemicalSection();
-        content.append(chemicalSection);
+        details.append(secChemical);
 
-        loadingDotsBox = buildLoadingDots();
-        loadingDotsBox.visible = false;
-        content.append(loadingDotsBox);
+        loadingDots = buildLoadingDots();
+        loadingDots.visible = false;
+        details.append(loadingDots);
 
-        dosageSection = new Box(Orientation.Vertical, 0);
-        dosageSection.hexpand = true;
-        dosageSection.halign = Align.Fill;
-        dosageSection.visible = false;
-        content.append(dosageSection);
-
+        secDosage = new Box(Orientation.Vertical, 0);
+        secDosage.hexpand = true;
+        secDosage.halign = Align.Fill;
+        secDosage.visible = false;
+        details.append(secDosage);
         // Background bg = new Background(
         //     6,      // maxSplotches
         //     120,    // msPerFrame
@@ -108,24 +108,24 @@ class Infobox : Overlay
         // bg.vexpand = true;
         // setChild(bg);
 
-        addOverlay(content);
-        setMeasureOverlay(content, true);
-        setClipOverlay(content, true);
+        Box root = new Box(Orientation.Vertical, 0);
+        root.append(subject);
+        root.append(details);
+        
+        setChild(root);
     }
 
     void update(Compound compound)
     {
         writeln("[Infobox] update called");
         if (compound is null)
-        {
-            writeln("[Infobox] Compound is null, returning");
             return;
-        }
 
-        currentCompound = compound;
-        moleculeViewer.setConformer(compound.conformer3D);
+        writeln("[Infobox] Compound: ", compound.name);
+        this.compound = compound;
+        moleculeView.setCompound(compound);
 
-        compoundNameLabel.label = compound.name;
+        titleLabel.label = compound.name;
         cidLabel.label = compound.cid > 0 ? compound.cid.to!string : "--";
         formulaLabel.label = compound.properties.formula.length > 0
             ? compound.properties.formula : "--";
@@ -143,9 +143,19 @@ class Infobox : Overlay
             ? compound.smiles : "--";
     }
 
+    final void setupMView()
+    {
+        moleculeView.setBaseZoom(10.0);
+        moleculeView.addCssClass("Y");
+        moleculeView.hexpand = false;
+        moleculeView.vexpand = false;
+        moleculeView.disableMotionControl();
+        subject.append(moleculeView);
+    }
+
     void reset()
     {
-        compoundNameLabel.label = "Select";
+        titleLabel.label = "Select";
         cidLabel.label = "--";
         formulaLabel.label = "--";
         weightLabel.label = "--";
@@ -155,23 +165,23 @@ class Infobox : Overlay
         xlogpLabel.label = "--";
         smilesLabel.label = "--";
 
-        currentCompound = null;
-        moleculeViewer.setConformer(null);
+        compound = null;
+        moleculeView.setCompound(null);
         hideLoading();
-        clearBox(dosageSection);
-        dosageSection.visible = false;
+        clearBox(secDosage);
+        secDosage.visible = false;
     }
 
     void showLoading()
     {
-        clearBox(dosageSection);
-        dosageSection.visible = false;
-        loadingDotsBox.visible = true;
+        clearBox(secDosage);
+        secDosage.visible = false;
+        loadingDots.visible = true;
     }
 
     void hideLoading()
     {
-        loadingDotsBox.visible = false;
+        loadingDots.visible = false;
     }
 
     void setDosage(DosageResult result)
@@ -181,11 +191,11 @@ class Infobox : Overlay
             result.source ? result.source.name : "primary");
 
         hideLoading();
-        clearBox(dosageSection);
+        clearBox(secDosage);
 
         if (result.dosages.length == 0)
         {
-            dosageSection.visible = false;
+            secDosage.visible = false;
             return;
         }
 
@@ -208,7 +218,7 @@ class Infobox : Overlay
             hdrBox.append(sourceLabel);
         }
 
-        dosageSection.append(hdrBox);
+        secDosage.append(hdrBox);
 
         foreach (d; result.dosages)
         {
@@ -221,11 +231,11 @@ class Infobox : Overlay
             appendRow(routeContent, "Common", d.common);
             appendRow(routeContent, "Strong", d.strong);
             appendRow(routeContent, "Heavy", d.heavy);
-            dosageSection.append(buildCollapsibleSubheading(d.route, routeContent));
-            dosageSection.append(routeContent);
+            secDosage.append(buildCollapsibleSubheading(d.route, routeContent));
+            secDosage.append(routeContent);
         }
 
-        dosageSection.visible = true;
+        secDosage.visible = true;
     }
 
     private void buildChemicalSection()
@@ -234,7 +244,7 @@ class Infobox : Overlay
         sectionHdr.addCssClass("infobox-section-header");
         sectionHdr.halign = Align.Fill;
         sectionHdr.xalign = 0;
-        chemicalSection.append(sectionHdr);
+        secChemical.append(sectionHdr);
 
         Box idContent = new Box(Orientation.Vertical, 0);
         idContent.hexpand = true;
@@ -242,8 +252,8 @@ class Infobox : Overlay
         appendLabelRow(idContent, "CID", cidLabel);
         appendLabelRow(idContent, "Formula", formulaLabel);
         // appendLabelRow(idContent, "SMILES", smilesLabel);
-        chemicalSection.append(buildCollapsibleSubheading("Identifiers", idContent));
-        chemicalSection.append(idContent);
+        secChemical.append(buildCollapsibleSubheading("Identifiers", idContent));
+        secChemical.append(idContent);
 
         Box propContent = new Box(Orientation.Vertical, 0);
         propContent.hexpand = true;
@@ -253,8 +263,8 @@ class Infobox : Overlay
         appendLabelRow(propContent, "Charge", chargeLabel);
         appendLabelRow(propContent, "TPSA", tpsaLabel);
         appendLabelRow(propContent, "XLogP", xlogpLabel);
-        chemicalSection.append(buildCollapsibleSubheading("Properties", propContent));
-        chemicalSection.append(propContent);
+        secChemical.append(buildCollapsibleSubheading("Properties", propContent));
+        secChemical.append(propContent);
     }
 
     private void appendLabelRow(Box parent, string label, Label value)
@@ -366,11 +376,5 @@ class Infobox : Overlay
         header.addController(motion);
 
         return header;
-    }
-
-    private void onViewerClicked(int nPress, double x, double y)
-    {
-        if (onViewerClick !is null)
-            onViewerClick();
     }
 }

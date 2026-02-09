@@ -14,3 +14,4 @@ wikia-test-*
 *.obj
 *.lst
 build_output*
+run_output*
