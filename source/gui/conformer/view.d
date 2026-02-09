@@ -20,30 +20,15 @@ import wikia.pubchem.conformer3d;
 class MoleculeView : DrawingArea
 {
 package:
-    struct HoverState
-    {
-        int atomId = -1;
-        size_t bondIdx = size_t.max;
-        string tooltip;
-        double x, y;
-
-        bool isValid() const => atomId != -1 || bondIdx != size_t.max;
-
-        void clear()
-        {
-            atomId = -1;
-            bondIdx = size_t.max;
-            tooltip = null;
-            x = y = 0;
-        }
-    }
-
     Compound compound;
     Camera camera;
-    HoverState hover;
     double dragStartRotX;
     double dragStartRotY;
     bool motionControl;
+
+    string tooltip;
+    double mouseX;
+    double mouseY;
 
     void delegate() onClick;
 
@@ -84,7 +69,6 @@ public:
     void setCompound(Compound compound)
     {
         this.compound = compound;
-        hover.clear();
         queueDraw();
     }
 
@@ -138,47 +122,29 @@ private:
         
         Conformer3D conformer = compound.conformer3D;
         if (conformer is null || !conformer.isValid())
-        {
-            hover.clear();
             return;
-        }
 
-        hover.x = x;
-        hover.y = y;
+        HitResult hit = hitTest(
+            x, 
+            y, 
+            getAllocatedWidth(), 
+            getAllocatedHeight(), 
+            conformer, 
+            camera
+        );
 
-        int width = getAllocatedWidth();
-        int height = getAllocatedHeight();
-        HitResult ret = hitTest(x, y, width, height, conformer, camera);
-
-        if (!ret.hit)
+        if (mouseX != x || mouseY != y)
         {
-            hover.clear();
-            queueDraw();
-            return;
-        }
+            if (hit.atomIdx >= 0)
+                tooltip = conformer.atoms[hit.atomIdx].element.name;
+            else if (hit.bondIdx >= 0)
+                tooltip = formatBondTooltip(conformer.bonds[hit.bondIdx]);
 
-        if (ret.isAtom)
-        {
-            if (ret.atomId == hover.atomId)
-                return;
-            
-            hover.atomId = ret.atomId;
-            hover.bondIdx = size_t.max;
-            int idx = conformer.indexOf(ret.atomId);
-            if (idx >= 0)
-                hover.tooltip = conformer.atoms[idx].element.name;
             queueDraw();
         }
-        else
-        {
-            if (ret.bondIdx == hover.bondIdx)
-                return;
-            
-            hover.atomId = -1;
-            hover.bondIdx = ret.bondIdx;
-            hover.tooltip = formatBondTooltip(conformer.bonds[ret.bondIdx]);
-            queueDraw();
-        }
+
+        mouseX = x;
+        mouseY = y;
     }
 
     void onLeave()
@@ -186,7 +152,6 @@ private:
         if (!motionControl)
             return;
         
-        hover.clear();
         queueDraw();
     }
 
@@ -215,18 +180,6 @@ private:
             height
         );
 
-        if (hover.tooltip !is null)
-        {
-            drawTooltip(
-                cr, 
-                hover.tooltip, 
-                hover.x, 
-                hover.y, 
-                width, 
-                height
-            );
-        }
-
         if (compound.conformer3D is null || !compound.conformer3D.isValid())
             return;
 
@@ -235,10 +188,21 @@ private:
             compound.conformer3D, 
             camera, 
             width, 
-            height, 
-            hover.atomId, 
-            hover.bondIdx
+            height
         );
+
+        if (tooltip != null)
+        {
+            drawTooltip(
+                cr, 
+                tooltip, 
+                mouseX, 
+                mouseY, 
+                width, 
+                height
+            );
+            tooltip = null;
+        }
 
         drawInfoText(
             cr, 

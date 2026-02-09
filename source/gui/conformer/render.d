@@ -92,9 +92,7 @@ void drawMolecule(
     Conformer3D conformer, 
     Camera cam, 
     int width, 
-    int height, 
-    int hoveredAtomId, 
-    size_t hoveredBondIdx
+    int height
 )
 {
     if (conformer is null || !conformer.isValid())
@@ -114,32 +112,7 @@ void drawMolecule(
         double[2] proj1 = cam.project(conformer.atoms[idx1].x, conformer.atoms[idx1].y, conformer.atoms[idx1].z);
         double[2] proj2 = cam.project(conformer.atoms[idx2].x, conformer.atoms[idx2].y, conformer.atoms[idx2].z);
 
-        bool isHovered;
-        double lineWidth = bond.order == 1 ? 2.0 : (bond.order == 2 ? 3.0 : 4.0);
-        if (hoveredBondIdx != size_t.max)
-        {
-            Bond3D hb = conformer.bonds[hoveredBondIdx];
-            isHovered = (hb.aid1 == bond.aid1 && hb.aid2 == bond.aid2)
-                || (hb.aid1 == bond.aid2 && hb.aid2 == bond.aid1);
-        }
-
-        if (isHovered)
-        {
-            double[3] color1 = getColor(conformer.atoms[idx1].element);
-            double[3] color2 = getColor(conformer.atoms[idx2].element);
-
-            cr.setSourceRgb(
-                (color1[0] + color2[0]) / 2.0,
-                (color1[1] + color2[1]) / 2.0,
-                (color1[2] + color2[2]) / 2.0
-            );
-            cr.setLineWidth(lineWidth + 4);
-            cr.moveTo(centerX + proj1[0], centerY + proj1[1]);
-            cr.lineTo(centerX + proj2[0], centerY + proj2[1]);
-            cr.stroke();
-        }
-
-        cr.setLineWidth(lineWidth);
+        cr.setLineWidth(bond.order == 1 ? 2.0 : (bond.order == 2 ? 3.0 : 4.0));
         cr.setSourceRgba(0.6, 0.6, 0.7, 0.8);
         cr.moveTo(centerX + proj1[0], centerY + proj1[1]);
         cr.lineTo(centerX + proj2[0], centerY + proj2[1]);
@@ -169,14 +142,6 @@ void drawMolecule(
         double radius = getRadius(atom.element) * cam.zoom * 0.3;
         double[2] proj = cam.project(atom.x, atom.y, atom.z);
         double[3] color = getColor(atom.element);
-
-        if (atom.aid == hoveredAtomId)
-        {
-            cr.arc(centerX + proj[0], centerY + proj[1], radius + 3, 0, 2 * PI);
-            cr.setSourceRgb(color[0], color[1], color[2]);
-            cr.setLineWidth(2);
-            cr.stroke();
-        }
 
         cr.setSourceRgb(color[0], color[1], color[2]);
         cr.arc(centerX + proj[0], centerY + proj[1], radius, 0, 2 * PI);

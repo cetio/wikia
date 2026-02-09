@@ -8,16 +8,23 @@ import wikia.pubchem.conformer3d;
 
 struct HitResult
 {
-    bool hit;
-    bool isAtom;
-    int atomId;
-    size_t bondIdx;
+    int atomIdx = -1;
+    int bondIdx = -1;
+
+    bool isValid() const 
+        => atomIdx > -1 || bondIdx > -1;
 }
 
-HitResult hitTest(double mouseX, double mouseY, int width, int height, Conformer3D conformer, Camera cam)
+HitResult hitTest(
+    double mouseX, 
+    double mouseY, 
+    int width, 
+    int height, 
+    Conformer3D conformer, 
+    Camera cam
+)
 {
     HitResult ret;
-    ret.hit = false;
 
     if (conformer is null || !conformer.isValid())
         return ret;
@@ -29,9 +36,9 @@ HitResult hitTest(double mouseX, double mouseY, int width, int height, Conformer
     double my = mouseY - centerY;
 
     double closestAtomDist = double.max;
-    int hoveredAtomId = -1;
+    int hoveredAtomIdx = -1;
 
-    foreach (atom; conformer.atoms)
+    foreach (i, atom; conformer.atoms)
     {
         double[2] proj = cam.project(atom.x, atom.y, atom.z);
         
@@ -40,21 +47,19 @@ HitResult hitTest(double mouseX, double mouseY, int width, int height, Conformer
 
         if (dist <= radius && dist < closestAtomDist)
         {
-            hoveredAtomId = atom.aid;
+            hoveredAtomIdx = cast(int)i;
             closestAtomDist = dist;
         }
     }
 
-    if (hoveredAtomId != -1)
+    if (hoveredAtomIdx != -1)
     {
-        ret.hit = true;
-        ret.isAtom = true;
-        ret.atomId = hoveredAtomId;
+        ret.atomIdx = hoveredAtomIdx;
         return ret;
     }
 
     double closestBondDist = double.max;
-    size_t hoveredBondIdx = size_t.max;
+    int hoveredBondIdx = -1;
 
     foreach (size_t i, bond; conformer.bonds)
     {
@@ -72,15 +77,13 @@ HitResult hitTest(double mouseX, double mouseY, int width, int height, Conformer
 
         if (dist <= bondWidth && dist < closestBondDist)
         {
-            hoveredBondIdx = i;
+            hoveredBondIdx = cast(int)i;
             closestBondDist = dist;
         }
     }
 
-    if (hoveredBondIdx != size_t.max)
+    if (hoveredBondIdx != -1)
     {
-        ret.hit = true;
-        ret.isAtom = false;
         ret.bondIdx = hoveredBondIdx;
     }
 
