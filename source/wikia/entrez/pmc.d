@@ -11,24 +11,12 @@ import wikia.page;
 
 private:
 
-string decodeXml(string text)
-{
-    if (text is null)
-        return null;
-    return text
-        .replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&amp;", "&")
-        .replace("&quot;", "\"")
-        .replace("&apos;", "'")
-        .replace("&#39;", "'")
-        .strip;
-}
-
-string xmlTag(string xml, string re)
+string quickTag(string xml, string re)
 {
     auto m = matchFirst(xml, regex(re));
-    return m.empty ? null : decodeXml(m[1]);
+    if (m.empty) return null;
+    return m[1].replace("&lt;", "<").replace("&gt;", ">")
+        .replace("&amp;", "&").strip;
 }
 
 Page[] parseArticles(string xml)
@@ -41,33 +29,20 @@ Page[] parseArticles(string xml)
     {
         string ax = m.hit;
 
-        string pmcId = xmlTag(ax, `<article-id[^>]*pub-id-type="pmc"[^>]*>(\d+)</article-id>`);
+        string pmcId = quickTag(ax, `<article-id[^>]*pub-id-type="pmc"[^>]*>(\d+)</article-id>`);
         if (pmcId is null)
             continue;
 
-        string title = xmlTag(ax, `<article-title[^>]*>([\s\S]*?)</article-title>`);
-        string doi = xmlTag(ax, `<article-id[^>]*pub-id-type="doi"[^>]*>([\s\S]*?)</article-id>`);
-        string pmid = xmlTag(ax, `<article-id[^>]*pub-id-type="pmid"[^>]*>(\d+)</article-id>`);
+        string title = quickTag(ax, `<article-title[^>]*>([\s\S]*?)</article-title>`);
 
         Page page = new Page();
         page.title = title !is null ? title : pmcId;
         page.source = "pmc";
         page.url = "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC"~pmcId~"/";
 
-        // Abstract as section
-        string abs = xmlTag(ax, `<abstract[^>]*>([\s\S]*?)</abstract>`);
-        if (abs !is null)
-            page._sections ~= Section("Abstract", abs, 1);
-
-        // Body as section
-        string body_ = xmlTag(ax, `<body[^>]*>([\s\S]*?)</body>`);
-        if (body_ !is null)
-            page._sections ~= Section("Body", body_, 1);
-
-        // Store metadata in raw for later extraction
-        page._raw = "PMC="~pmcId
-           ~(pmid !is null ? "\nPMID="~pmid : "")
-           ~(doi !is null ? "\nDOI="~doi : "");
+        // Store the full XML article so the AST XML parser can process it.
+        page._raw = ax;
+        page._parsed = false;
 
         ret ~= page;
     }
@@ -106,12 +81,6 @@ string getDOI(Page page)
     if (page is null || page._raw is null)
         return null;
 
-    string raw = page._raw;
-    auto idx = raw.indexOf("DOI=");
-    if (idx < 0)
-        return null;
-
-    string rest = raw[idx + 4..$];
-    auto nl = rest.indexOf("\n");
-    return nl >= 0 ? rest[0..nl] : rest;
+    return quickTag(page._raw,
+        `<article-id[^>]*pub-id-type="doi"[^>]*>([\s\S]*?)</article-id>`);
 }

@@ -9,7 +9,7 @@ import gtk.gesture_click;
 import gtk.types : Orientation, Align;
 
 import gui.article.expander;
-import wikia.page : Page, Section, cleanWikitext;
+import wikia.page : Page, Section;
 import wikia.psychonaut : getReports, getPagesByTitle;
 
 class Reports : Expander

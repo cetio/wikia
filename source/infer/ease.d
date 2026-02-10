@@ -8,7 +8,7 @@ import std.conv : to;
 
 import intuit;
 import infer.config;
-import wikia.page : Page, Section, cleanWikitext;
+import wikia.page : Page, Section;
 
 private:
 
@@ -86,18 +86,17 @@ SourceSection[] extractSections(Page[] pages)
         {
             if (currentParent.length == 0)
                 return;
-            string cleaned = cleanWikitext(currentContent);
-            if (cleaned.length >= MIN_CONTENT_LENGTH && !isExcluded(currentParent))
+            if (currentContent.length >= MIN_CONTENT_LENGTH && !isExcluded(currentParent))
             {
-                all ~= SourceSection(currentParent, cleaned, 2, page.source);
+                all ~= SourceSection(currentParent, currentContent, 2, page.source);
                 writeln("[Ease]   + '", currentParent, "' (",
-                    cleaned.length, " chars, ", subCount, " subsections folded)");
+                    currentContent.length, " chars, ", subCount, " subsections folded)");
             }
             else if (isExcluded(currentParent))
                 writeln("[Ease]   - SKIP '", currentParent, "' (excluded)");
             else
                 writeln("[Ease]   - SKIP '", currentParent,
-                    "' (too short: ", cleaned.length, ")");
+                    "' (too short: ", currentContent.length, ")");
             currentParent = null;
             currentContent = null;
             subCount = 0;
@@ -123,13 +122,12 @@ SourceSection[] extractSections(Page[] pages)
                 }
                 else
                 {
-                    string cleaned = cleanWikitext(sec.content);
-                    if (cleaned.length >= MIN_CONTENT_LENGTH
+                    if (sec.content.length >= MIN_CONTENT_LENGTH
                         && !isExcluded(sec.heading))
                     {
-                        all ~= SourceSection(sec.heading, cleaned, 2, page.source);
+                        all ~= SourceSection(sec.heading, sec.content, 2, page.source);
                         writeln("[Ease]   + '", sec.heading,
-                            "' (", cleaned.length, " chars, orphan)");
+                            "' (", sec.content.length, " chars, orphan)");
                     }
                 }
             }

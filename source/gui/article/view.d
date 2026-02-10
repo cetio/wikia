@@ -24,12 +24,14 @@ import gui.article.reports : Reports;
 import gui.conformer.view;
 
 import wikia.pubchem;
-import wikia.page : Page, Section, cleanWikitext;
+import wikia.page : Page, Section;
+import wikia.text.ast : Document, Node, NodeType;
 import wikia.psychonaut : DosageResult, resolvePage;
 import infer.ease : ease, SectionCallback, HeadingsCallback;
 import infer.resolve : extractCompoundNames;
 import infer.config : config;
 
+import gui.article.render : renderPage, renderNode;
 import gui.loading : makeLoadingDots;
 
 class ArticleView : Overlay
@@ -259,82 +261,61 @@ private:
         return lbl;
     }
 
-    void populateSectionContent(Expander exp, string rawContent)
+    void populateSectionContent(Expander exp, Section sec)
     {
-        // Simple manual scan for ===...=== markers
-        struct SubSec { size_t start; size_t end; string heading; }
-        SubSec[] subs;
-
-        size_t i = 0;
-        while (i + 3 < rawContent.length)
+        if (sec.content.length == 0)
         {
-            if (rawContent[i .. i + 3] == "===")
-            {
-                size_t hStart = i + 3;
-                auto closeIdx = rawContent[hStart .. $].indexOf("===");
-                if (closeIdx >= 0)
-                {
-                    string heading = rawContent[hStart .. hStart + closeIdx].strip;
-                    if (heading.length > 0)
-                    {
-                        subs ~= SubSec(i, hStart + closeIdx + 3, heading);
-                        i = hStart + closeIdx + 3;
-                        continue;
-                    }
-                }
-            }
-            i++;
-        }
-
-        if (subs.length == 0)
-        {
-            string cleaned = cleanWikitext(rawContent);
-            if (cleaned.length > 0)
-            {
-                Label lbl = makeTextLabel(linkifyUrls(cleaned), true);
-                exp.addContent(lbl);
-                resolveCompoundLinks(lbl, cleaned);
-            }
-            else
-            {
-                Label empty = new Label("No content.");
-                empty.addCssClass("expander-detail");
-                empty.halign = Align.Start;
-                exp.addContent(empty);
-            }
+            Label empty = new Label("No content.");
+            empty.addCssClass("expander-detail");
+            empty.halign = Align.Start;
+            exp.addContent(empty);
             return;
         }
 
-        size_t lastEnd = 0;
-        foreach (ref sub; subs)
+        string markup = linkifyUrls(sec.content);
+        Label lbl = makeTextLabel(markup, true);
+        exp.addContent(lbl);
+        resolveCompoundLinks(lbl, sec.content);
+    }
+
+    void populateFromAST(Expander exp, Page page, ref const Node secNode)
+    {
+        auto doc = page.document();
+        if (doc.nodes.length == 0 || !secNode.hasChildren)
         {
-            string before = rawContent[lastEnd .. sub.start];
-            string cleanedBefore = cleanWikitext(before);
-            if (cleanedBefore.length > 0)
-            {
-                Label lbl = makeTextLabel(linkifyUrls(cleanedBefore), true);
-                exp.addContent(lbl);
-                resolveCompoundLinks(lbl, cleanedBefore);
-            }
-
-            Label subHead = new Label(sub.heading);
-            subHead.addCssClass("article-subheading");
-            subHead.halign = Align.Start;
-            subHead.xalign = 0;
-            exp.addContent(subHead);
-
-            lastEnd = sub.end;
+            Label empty = new Label("No content.");
+            empty.addCssClass("expander-detail");
+            empty.halign = Align.Start;
+            exp.addContent(empty);
+            return;
         }
 
-        if (lastEnd < rawContent.length)
+        // Recursively render section children, handling nested sections.
+        renderSectionChildren(doc, secNode, exp.content);
+    }
+
+    void renderSectionChildren(ref Document doc, ref const Node sec, Box container)
+    {
+        uint ci = sec.childStart;
+        while (ci < sec.childEnd)
         {
-            string tail = cleanWikitext(rawContent[lastEnd .. $]);
-            if (tail.length > 0)
+            if (doc.nodes[ci].type == NodeType.Section)
             {
-                Label lbl = makeTextLabel(linkifyUrls(tail), true);
-                exp.addContent(lbl);
-                resolveCompoundLinks(lbl, tail);
+                // Subsection: render heading + recurse into children.
+                if (doc.nodes[ci].text.length > 0)
+                {
+                    Label subHead = new Label(cast(string) doc.nodes[ci].text);
+                    subHead.addCssClass("article-subheading");
+                    subHead.halign = Align.Start;
+                    subHead.xalign = 0;
+                    container.append(subHead);
+                }
+                if (doc.nodes[ci].hasChildren)
+                    renderSectionChildren(doc, doc.nodes[ci], container);
             }
+            else
+                renderNode(doc, doc.nodes[ci], container);
+            ci = doc.nextSiblingIdx(ci);
         }
     }
 
@@ -350,53 +331,29 @@ private:
             string raw = page.raw;
             if (raw is null || raw.length == 0) continue;
 
-            string preamble = cleanWikitext(page.preamble);
-            if (preamble.length > 0)
+            auto doc = page.document();
+            if (doc.nodes.length == 0) continue;
+
+            // Render preamble via AST nodes.
+            auto preambleNodes = doc.preamble();
+            if (preambleNodes.length > 0)
             {
                 hadIntro = true;
-                Label lbl = makeTextLabel(linkifyUrls(preamble), true);
-                synthesisBody.append(lbl);
-                resolveCompoundLinks(lbl, preamble);
+                foreach (ref pn; preambleNodes)
+                    renderNode(doc, pn, synthesisBody);
             }
 
-            Section[] sections = page.sections;
-            Expander currentExp;
-            string currentContent;
-
-            void flushExpander()
+            // Render sections as expanders using the AST.
+            foreach (ref secNode; doc.sections())
             {
-                if (currentExp !is null)
-                {
-                    populateSectionContent(currentExp, currentContent);
-                    synthesisBody.append(currentExp);
-                    currentExp = null;
-                    currentContent = null;
-                }
-            }
-
-            foreach (sec; sections)
-            {
-                if (isExcludedHeading(sec.heading))
+                string heading = cast(string) secNode.text;
+                if (isExcludedHeading(heading))
                     continue;
 
-                if (sec.level <= 2)
-                {
-                    flushExpander();
-                    currentExp = new Expander(sec.heading);
-                    currentContent = sec.content;
-                }
-                else
-                {
-                    if (currentExp !is null)
-                        currentContent ~= "\n\n===" ~ sec.heading ~ "===\n" ~ sec.content;
-                    else
-                    {
-                        currentExp = new Expander(sec.heading);
-                        currentContent = sec.content;
-                    }
-                }
+                Expander exp = new Expander(heading);
+                populateFromAST(exp, page, secNode);
+                synthesisBody.append(exp);
             }
-            flushExpander();
         }
 
         if (!hadIntro && compound !is null)
@@ -511,12 +468,12 @@ private:
                             synthesisBody.remove(introPlaceholder);
                             introPlaceholder = null;
                         }
-                        string cleaned = cleanWikitext(sec.content);
-                        if (cleaned.length > 0)
+                        if (sec.content.length > 0)
                         {
-                            Label lbl = makeTextLabel(linkifyUrls(cleaned), true);
+                            Label lbl = makeTextLabel(
+                                linkifyUrls(sec.content), true);
                             synthesisBody.prepend(lbl);
-                            resolveCompoundLinks(lbl, cleaned);
+                            resolveCompoundLinks(lbl, sec.content);
                         }
                         return;
                     }
@@ -526,7 +483,7 @@ private:
 
                     Expander exp = sectionExpanders[*pExpIdx];
                     exp.setTitle(sec.heading);
-                    populateSectionContent(exp, sec.content);
+                    populateSectionContent(exp, sec);
                 },
                 { writeln("[ArticleView] Synthesis complete"); },
                 allPages);
@@ -606,7 +563,7 @@ private:
         reportView.append(reportBody);
         scroller.setChild(reportView);
 
-        // Fetch and render root in background
+        // Fetch and render report in background using AST
         Thread fetchThread = new Thread({
             try
             {
@@ -622,44 +579,7 @@ private:
                 }
 
                 reportBody.remove(loadingLabel);
-
-                // Preamble
-                string preamble = report.preamble;
-                if (preamble.length > 0)
-                {
-                    Label preLabel = new Label(preamble);
-                    preLabel.addCssClass("report-body-text");
-                    preLabel.halign = Align.Start;
-                    preLabel.xalign = 0;
-                    preLabel.wrap = true;
-                    preLabel.hexpand = true;
-                    preLabel.selectable = true;
-                    reportBody.append(preLabel);
-                }
-
-                // Sections
-                Section[] secs = report.sections;
-                foreach (sec; secs)
-                {
-                    Label secHeading = new Label(sec.heading);
-                    secHeading.addCssClass("report-section-heading");
-                    secHeading.halign = Align.Start;
-                    secHeading.xalign = 0;
-                    reportBody.append(secHeading);
-
-                    string cleaned = cleanWikitext(sec.content);
-                    if (cleaned.length > 0)
-                    {
-                        Label secContent = new Label(cleaned);
-                        secContent.addCssClass("report-body-text");
-                        secContent.halign = Align.Start;
-                        secContent.xalign = 0;
-                        secContent.wrap = true;
-                        secContent.hexpand = true;
-                        secContent.selectable = true;
-                        reportBody.append(secContent);
-                    }
-                }
+                renderPage(report, reportBody);
             }
             catch (Exception e)
             {

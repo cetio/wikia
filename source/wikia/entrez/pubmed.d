@@ -11,24 +11,12 @@ import wikia.page;
 
 private:
 
-string decodeXml(string text)
-{
-    if (text is null)
-        return null;
-    return text
-        .replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&amp;", "&")
-        .replace("&quot;", "\"")
-        .replace("&apos;", "'")
-        .replace("&#39;", "'")
-        .strip;
-}
-
-string xmlTag(string xml, string re)
+string quickTag(string xml, string re)
 {
     auto m = matchFirst(xml, regex(re));
-    return m.empty ? null : decodeXml(m[1]);
+    if (m.empty) return null;
+    return m[1].replace("&lt;", "<").replace("&gt;", ">")
+        .replace("&amp;", "&").strip;
 }
 
 Page[] parseArticles(string xml)
@@ -41,28 +29,20 @@ Page[] parseArticles(string xml)
     {
         string ax = m.hit;
 
-        string pmid = xmlTag(ax, `<PMID[^>]*>(\d+)</PMID>`);
+        string pmid = quickTag(ax, `<PMID[^>]*>(\d+)</PMID>`);
         if (pmid is null)
             continue;
 
-        string title = xmlTag(ax, `<ArticleTitle[^>]*>([\s\S]*?)</ArticleTitle>`);
-        string doi = xmlTag(ax, `<ELocationID[^>]*EIdType="doi"[^>]*>([\s\S]*?)</ELocationID>`);
-        string journal = xmlTag(ax, `<Title[^>]*>([\s\S]*?)</Title>`);
+        string title = quickTag(ax, `<ArticleTitle[^>]*>([\s\S]*?)</ArticleTitle>`);
 
         Page page = new Page();
         page.title = title !is null ? title : pmid;
         page.source = "pubmed";
         page.url = "https://pubmed.ncbi.nlm.nih.gov/"~pmid~"/";
 
-        // Abstract as section
-        string abs = xmlTag(ax, `<AbstractText[^>]*>([\s\S]*?)</AbstractText>`);
-        if (abs !is null)
-            page._sections ~= Section("Abstract", abs, 1);
-
-        // Store DOI and PMID in raw for later extraction
-        page._raw = "PMID="~pmid
-           ~(doi !is null ? "\nDOI="~doi : "")
-           ~(journal !is null ? "\nJournal="~journal : "");
+        // Store the full XML article so the AST XML parser can process it.
+        page._raw = ax;
+        page._parsed = false;
 
         ret ~= page;
     }
