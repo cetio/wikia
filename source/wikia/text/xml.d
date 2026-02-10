@@ -33,7 +33,8 @@ private struct XmlParser
         while (pos < src.length)
         {
             skipWhitespace();
-            if (pos >= src.length) break;
+            if (pos >= src.length)
+                break;
 
             if (matchAt("<!--"))
             {
@@ -43,97 +44,21 @@ private struct XmlParser
 
             if (src[pos] == '<')
             {
-                // Check for specific structural elements.
-                if (matchTag("article-title"))
-                {
-                    parseSimpleElement("article-title", NodeType.Section, 1);
+                if (dispatchTag())
                     continue;
-                }
-                if (matchTag("title"))
-                {
-                    parseSimpleElement("title", NodeType.Section, 2);
-                    continue;
-                }
-                if (matchTag("abstract"))
-                {
-                    parseSectionElement("abstract", "Abstract", 2);
-                    continue;
-                }
-                if (matchTag("body"))
-                {
-                    parseBodyElement();
-                    continue;
-                }
-                if (matchTag("sec"))
-                {
-                    parseSec();
-                    continue;
-                }
-                if (matchTag("p"))
-                {
-                    parseParagraphElement();
-                    continue;
-                }
-                if (matchTag("list"))
-                {
-                    parseListElement();
-                    continue;
-                }
-                if (matchTag("table-wrap") || matchTag("table"))
-                {
-                    skipElement();
-                    continue;
-                }
-                if (matchTag("fig"))
-                {
-                    skipElement();
-                    continue;
-                }
-                if (matchTag("ref-list"))
-                {
-                    skipElement();
-                    continue;
-                }
-                if (matchTag("xref"))
-                {
-                    parseXref();
-                    continue;
-                }
-                if (matchTag("ext-link"))
-                {
-                    parseExtLink();
-                    continue;
-                }
-                if (matchTag("bold") || matchTag("b"))
-                {
-                    parseInlineElement("bold", NodeType.Bold);
-                    continue;
-                }
-                if (matchTag("italic") || matchTag("i"))
-                {
-                    parseInlineElement("italic", NodeType.Italic);
-                    continue;
-                }
-                if (matchTag("sup") || matchTag("sub") ||
-                    matchTag("sc") || matchTag("monospace"))
-                {
-                    parseGenericInline();
-                    continue;
-                }
 
-                // Closing tag or unknown — skip it.
+                // Closing tag or processing instruction — skip.
                 if (src[pos + 1] == '/' || src[pos + 1] == '?')
                 {
                     skipToAfter('>');
                     continue;
                 }
 
-                // Unknown opening tag — try to extract text content.
+                // Unknown opening tag.
                 skipTag();
                 continue;
             }
 
-            // Text content outside of tags.
             parseTextContent();
         }
 
@@ -141,12 +66,44 @@ private struct XmlParser
         nodes[0].childEnd = cast(uint) nodes.length;
     }
 
+    /// Dispatch on the current XML tag name. Returns true if a known
+    /// tag was matched and handled, false otherwise.
+    bool dispatchTag()
+    {
+        // Structural elements
+        if (matchTag("article-title")) { parseSimpleElement("article-title", NodeType.Section, 1); return true; }
+        if (matchTag("title"))         { parseSimpleElement("title", NodeType.Section, 2); return true; }
+        if (matchTag("abstract"))      { parseSectionElement("abstract", "Abstract", 2); return true; }
+        if (matchTag("body"))          { parseBodyElement(); return true; }
+        if (matchTag("sec"))           { parseSec(); return true; }
+        if (matchTag("p"))             { parseParagraphElement(); return true; }
+        if (matchTag("list"))          { parseListElement(); return true; }
+
+        // Skipped elements
+        if (matchTag("table-wrap") || matchTag("table")) { skipElement(); return true; }
+        if (matchTag("fig"))        { skipElement(); return true; }
+        if (matchTag("ref-list"))   { skipElement(); return true; }
+
+        // Inline elements
+        if (matchTag("xref"))     { parseXref(); return true; }
+        if (matchTag("ext-link")) { parseExtLink(); return true; }
+        if (matchTag("bold") || matchTag("b"))   { parseInlineElement("bold", NodeType.Bold); return true; }
+        if (matchTag("italic") || matchTag("i")) { parseInlineElement("italic", NodeType.Italic); return true; }
+        if (matchTag("sup") || matchTag("sub") || matchTag("sc") || matchTag("monospace"))
+        {
+            parseGenericInline();
+            return true;
+        }
+
+        return false;
+    }
+
     // --- Structural elements ---
 
     void parseSec()
     {
         skipToAfter('>'); // skip <sec ...>
-        auto secNode = Node(NodeType.Section);
+        Node secNode = Node(NodeType.Section);
         secNode.level = 2;
         uint secIdx = cast(uint) nodes.length;
         nodes ~= secNode;
@@ -249,7 +206,7 @@ private struct XmlParser
     {
         skipToAfter('>');
 
-        auto secNode = Node(NodeType.Section);
+        Node secNode = Node(NodeType.Section);
         secNode.text = heading;
         secNode.level = level;
         uint secIdx = cast(uint) nodes.length;
@@ -303,9 +260,8 @@ private struct XmlParser
     {
         skipToAfter('>');
 
-        auto pNode = Node(NodeType.Paragraph);
-        uint pIdx = cast(uint) nodes.length;
-        nodes ~= pNode;
+        uint paragraphIdx = cast(uint) nodes.length;
+        nodes ~= Node(NodeType.Paragraph);
         uint childStart = cast(uint) nodes.length;
 
         while (pos < src.length)
@@ -346,8 +302,8 @@ private struct XmlParser
             parseTextContent();
         }
 
-        nodes[pIdx].childStart = childStart;
-        nodes[pIdx].childEnd = cast(uint) nodes.length;
+        nodes[paragraphIdx].childStart = childStart;
+        nodes[paragraphIdx].childEnd = cast(uint) nodes.length;
     }
 
     void parseListElement()
@@ -355,12 +311,12 @@ private struct XmlParser
         // Determine list type from attributes.
         size_t tagStart = pos;
         skipToAfter('>');
-        const(char)[] tagText = src[tagStart .. pos];
+        const(char)[] tagText = src[tagStart..pos];
 
         bool ordered = sliceContains(tagText, "list-type=\"order\"");
-        auto listNode = Node(ordered ? NodeType.OrderedList : NodeType.UnorderedList);
+        NodeType listType = ordered ? NodeType.OrderedList : NodeType.UnorderedList;
         uint listIdx = cast(uint) nodes.length;
-        nodes ~= listNode;
+        nodes ~= Node(listType);
         uint childStart = cast(uint) nodes.length;
 
         while (pos < src.length)
@@ -397,10 +353,10 @@ private struct XmlParser
     {
         skipToAfter('>');
 
-        auto item = Node(NodeType.ListItem);
-        item.level = 1;
+        Node itemNode = Node(NodeType.ListItem);
+        itemNode.level = 1;
         uint itemIdx = cast(uint) nodes.length;
-        nodes ~= item;
+        nodes ~= itemNode;
         uint childStart = cast(uint) nodes.length;
 
         while (pos < src.length)
@@ -433,7 +389,7 @@ private struct XmlParser
 
     // --- Inline elements ---
 
-    void parseInlineElement(string tag, NodeType nt)
+    void parseInlineElement(string tag, NodeType nodeType)
     {
         // Determine actual tag name from source for closing match.
         size_t start = pos + 1; // after '<'
@@ -450,9 +406,8 @@ private struct XmlParser
                 || src[start + 1] == ' '))
             closeTag = "i";
 
-        auto fmtNode = Node(nt);
         uint fmtIdx = cast(uint) nodes.length;
-        nodes ~= fmtNode;
+        nodes ~= Node(nodeType);
         uint childStart = cast(uint) nodes.length;
 
         while (pos < src.length)
@@ -495,9 +450,9 @@ private struct XmlParser
         {
             if (closeIdx > textStart)
             {
-                auto t = Node(NodeType.Text);
-                t.text = src[textStart .. closeIdx];
-                nodes ~= t;
+                Node textNode = Node(NodeType.Text);
+                textNode.text = src[textStart .. closeIdx];
+                nodes ~= textNode;
             }
             pos = closeIdx + closeStr.length;
         }
@@ -509,7 +464,7 @@ private struct XmlParser
         size_t tagStart = pos;
         skipToAfter('>');
 
-        auto refNode = Node(NodeType.Reference);
+        Node refNode = Node(NodeType.Reference);
         size_t textStart = pos;
         size_t closeIdx = indexOfStr(pos, "</xref>");
         if (closeIdx != size_t.max)
@@ -537,26 +492,26 @@ private struct XmlParser
             href = extractAttr(tagAttrs, "href");
         pos = tagEnd + 1;
 
-        auto link = Node(NodeType.ExtLink);
-        link.target = href;
+        Node extLinkNode = Node(NodeType.ExtLink);
+        extLinkNode.target = href;
 
         size_t textStart = pos;
         size_t closeIdx = indexOfStr(pos, "</ext-link>");
         if (closeIdx != size_t.max)
         {
-            link.text = src[textStart .. closeIdx];
+            extLinkNode.text = src[textStart .. closeIdx];
             pos = closeIdx + 11;
         }
-        nodes ~= link;
+        nodes ~= extLinkNode;
     }
 
-    void parseSimpleElement(string tag, NodeType nt, ubyte level)
+    void parseSimpleElement(string tag, NodeType nodeType, ubyte level)
     {
         const(char)[] text = extractElementText(tag);
-        auto n = Node(nt);
-        n.text = text;
-        n.level = level;
-        nodes ~= n;
+        Node elementNode = Node(nodeType);
+        elementNode.text = text;
+        elementNode.level = level;
+        nodes ~= elementNode;
     }
 
     // --- Text content ---
@@ -572,9 +527,9 @@ private struct XmlParser
             const(char)[] text = decodeEntities(src[start .. pos]);
             if (text.length > 0)
             {
-                auto t = Node(NodeType.Text);
-                t.text = text;
-                nodes ~= t;
+                Node textNode = Node(NodeType.Text);
+                textNode.text = text;
+                nodes ~= textNode;
             }
         }
     }
@@ -585,12 +540,12 @@ private struct XmlParser
         size_t endIdx = indexOfStr(pos, "-->");
         if (endIdx == size_t.max)
         {
-            nodes ~= Node(NodeType.Comment, src[pos .. $]);
+            nodes ~= Node(NodeType.Comment, src[pos..$]);
             pos = src.length;
         }
         else
         {
-            nodes ~= Node(NodeType.Comment, src[pos .. endIdx]);
+            nodes ~= Node(NodeType.Comment, src[pos..endIdx]);
             pos = endIdx + 3;
         }
     }
@@ -627,7 +582,7 @@ private struct XmlParser
             && src[nameEnd] != '>' && src[nameEnd] != '/')
             nameEnd++;
 
-        string tagName = cast(string) src[start .. nameEnd];
+        string tagName = cast(string) src[start..nameEnd];
         skipToAfter('>');
 
         // Check if it was self-closing.
@@ -636,8 +591,8 @@ private struct XmlParser
 
         // Find matching close, handling nesting.
         int depth = 1;
-        string openStr = "<" ~ tagName;
-        string closeStr = "</" ~ tagName ~ ">";
+        string openStr = "<"~tagName;
+        string closeStr = "</"~tagName~">";
         while (pos < src.length && depth > 0)
         {
             if (matchAt(closeStr))
@@ -659,7 +614,7 @@ private struct XmlParser
     {
         if (pos + 1 + name.length > src.length) return false;
         if (src[pos] != '<') return false;
-        if (src[pos + 1 .. pos + 1 + name.length] != name) return false;
+        if (src[pos + 1..pos + 1 + name.length] != name) return false;
         size_t after = pos + 1 + name.length;
         if (after >= src.length) return false;
         return src[after] == '>' || src[after] == ' ' || src[after] == '/' || src[after] == '\n';
@@ -669,25 +624,25 @@ private struct XmlParser
     {
         if (pos + 2 + name.length > src.length) return false;
         if (src[pos] != '<' || src[pos + 1] != '/') return false;
-        if (src[pos + 2 .. pos + 2 + name.length] != name) return false;
+        if (src[pos + 2..pos + 2 + name.length] != name) return false;
         size_t after = pos + 2 + name.length;
         return after < src.length && (src[after] == '>' || src[after] == ' ');
     }
 
     bool matchAt(string s) const
     {
-        return pos + s.length <= src.length && src[pos .. pos + s.length] == s;
+        return pos + s.length <= src.length && src[pos..pos + s.length] == s;
     }
 
     const(char)[] extractElementText(string tag)
     {
         skipToAfter('>');
         size_t textStart = pos;
-        string closeTag = "</" ~ tag ~ ">";
+        string closeTag = "</"~tag~">";
         size_t closeIdx = indexOfStr(pos, closeTag);
         if (closeIdx == size_t.max)
             return null;
-        const(char)[] raw = src[textStart .. closeIdx];
+        const(char)[] raw = src[textStart..closeIdx];
         pos = closeIdx + closeTag.length;
         return stripTags(raw);
     }
@@ -704,7 +659,7 @@ private struct XmlParser
         if (s.length == 0) return from;
         if (from + s.length > src.length) return size_t.max;
         for (size_t j = from; j + s.length <= src.length; j++)
-            if (src[j .. j + s.length] == s) return j;
+            if (src[j..j + s.length] == s) return j;
         return size_t.max;
     }
 
@@ -721,7 +676,7 @@ private struct XmlParser
             if (text[i] == '<')
             {
                 if (i > start)
-                    result ~= text[start .. i];
+                    result ~= text[start..i];
                 while (i < text.length && text[i] != '>')
                     i++;
                 if (i < text.length) i++; // skip '>'
@@ -731,21 +686,21 @@ private struct XmlParser
                 i++;
         }
         if (start < text.length)
-            result ~= text[start .. $];
+            result ~= text[start..$];
         return result;
     }
 
     static const(char)[] extractAttr(const(char)[] tag, const(char)[] attr)
     {
         // Find attr="value" in tag text.
-        string search = cast(string)(attr ~ "=\"");
+        string search = cast(string)(attr~"=\"");
         size_t idx = sliceIndexOf(tag, search);
         if (idx == size_t.max) return null;
         size_t valStart = idx + search.length;
         size_t valEnd = valStart;
         while (valEnd < tag.length && tag[valEnd] != '"')
             valEnd++;
-        return tag[valStart .. valEnd];
+        return tag[valStart..valEnd];
     }
 
     static size_t sliceIndexOf(const(char)[] hay, const(char)[] needle)
@@ -753,7 +708,7 @@ private struct XmlParser
         if (needle.length == 0) return 0;
         if (hay.length < needle.length) return size_t.max;
         for (size_t j = 0; j + needle.length <= hay.length; j++)
-            if (hay[j .. j + needle.length] == needle) return j;
+            if (hay[j..j + needle.length] == needle) return j;
         return size_t.max;
     }
 
@@ -780,7 +735,7 @@ private struct XmlParser
             if (text[i] == '&')
             {
                 if (i > start)
-                    result ~= text[start .. i];
+                    result ~= text[start..i];
 
                 size_t semicol = i + 1;
                 while (semicol < text.length && semicol < i + 12 && text[semicol] != ';')
@@ -788,7 +743,7 @@ private struct XmlParser
 
                 if (semicol < text.length && text[semicol] == ';')
                 {
-                    const(char)[] entity = text[i + 1 .. semicol];
+                    const(char)[] entity = text[i + 1..semicol];
                     if (entity == "amp") result ~= "&";
                     else if (entity == "lt") result ~= "<";
                     else if (entity == "gt") result ~= ">";
@@ -800,10 +755,10 @@ private struct XmlParser
                     else if (entity.length > 1 && entity[0] == '#')
                     {
                         // Numeric entity — just output the raw text.
-                        result ~= text[i .. semicol + 1];
+                        result ~= text[i..semicol + 1];
                     }
                     else
-                        result ~= text[i .. semicol + 1];
+                        result ~= text[i..semicol + 1];
 
                     i = semicol + 1;
                     start = i;
@@ -819,7 +774,7 @@ private struct XmlParser
                 i++;
         }
         if (start < text.length)
-            result ~= text[start .. $];
+            result ~= text[start..$];
         return result;
     }
 }

@@ -162,7 +162,7 @@ public:
         if (navHistory.length > 0)
         {
             string prev = navHistory[$ - 1];
-            navHistory = navHistory[0 .. $ - 1];
+            navHistory = navHistory[0..$ - 1];
             if (onCompoundNavigate !is null)
                 onCompoundNavigate(prev);
         }
@@ -637,7 +637,7 @@ private:
         import std.string : startsWith;
         if (uri.startsWith("compound:"))
         {
-            string name = uri[9 .. $];
+            string name = uri[9..$];
             writeln("[ArticleView] Compound link clicked: ", name);
             if (onCompoundNavigate !is null)
                 onCompoundNavigate(name);
@@ -674,7 +674,7 @@ private:
     {
         import std.string : indexOf;
         string escaped = name.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
-        string linked = `<a href="compound:` ~ name ~ `">` ~ escaped ~ `</a>`;
+        string linked = `<a href="compound:`~name~`">`~escaped~`</a>`;
 
         // Replace first occurrence that isn't already inside a tag
         auto idx = markup.indexOf(escaped);
@@ -683,13 +683,13 @@ private:
             // Check we're not inside an existing <a> tag
             bool insideTag = false;
             int openTags = 0;
-            foreach (i; 0 .. idx)
+            foreach (i; 0..idx)
             {
                 if (markup[i] == '<') openTags++;
                 if (markup[i] == '>') openTags--;
             }
             if (openTags <= 0)
-                markup = markup[0 .. idx] ~ linked ~ markup[idx + escaped.length .. $];
+                markup = markup[0..idx]~linked~markup[idx + escaped.length..$];
         }
         return markup;
     }
@@ -704,7 +704,7 @@ private:
         // Convert URLs to <a> tags
         enum urlRe = ctRegex!(`https?://[^\s<>"]+`);
         text = replaceAll!((m) =>
-            `<a href="` ~ m.hit ~ `">` ~ m.hit ~ `</a>`
+            `<a href="`~m.hit~`">`~m.hit~`</a>`
         )(text, urlRe);
 
         return text;

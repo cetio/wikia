@@ -68,7 +68,7 @@ struct Node
     {
         if (childStart >= childEnd)
             return [];
-        return cast(Node[]) allNodes[childStart .. childEnd];
+        return cast(Node[]) allNodes[childStart..childEnd];
     }
 
     bool hasChildren() const pure nothrow @nogc

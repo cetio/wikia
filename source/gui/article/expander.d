@@ -37,7 +37,7 @@ public:
         headerBox.halign = Align.Fill;
         headerBox.hexpand = true;
 
-        header = new Label("▸ " ~ title);
+        header = new Label("▸ "~title);
         header.halign = Align.Start;
         header.xalign = 0;
         header.hexpand = true;
@@ -47,7 +47,7 @@ public:
         click.connectReleased((int nPress, double x, double y) {
             expanded = !expanded;
             content.visible = expanded;
-            header.label = (expanded ? "▾ " : "▸ ") ~ _title;
+            header.label = (expanded ? "▾ " : "▸ ")~_title;
             if (expanded && !firstExpandFired)
             {
                 firstExpandFired = true;
@@ -84,7 +84,7 @@ public:
     void setTitle(string title)
     {
         _title = title;
-        header.label = (expanded ? "▾ " : "▸ ") ~ _title;
+        header.label = (expanded ? "▾ " : "▸ ")~_title;
         if (_loading)
             setLoading(false);
     }

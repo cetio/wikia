@@ -52,8 +52,8 @@ private:
         cid.halign = Align.End;
         row.append(cid);
 
-        Label src = new Label("PubChem");
-        src.addCssClass("search-result-detail");
+        Label src = new Label("PUBCHEM");
+        src.addCssClass("search-result-source");
         src.halign = Align.End;
         src.marginStart = 8;
         row.append(src);
@@ -168,7 +168,7 @@ public:
         links.halign = Align.Center;
         links.marginTop = 24;
         links.append(new Label("Powered by"));
-        Label pubchemLink = new Label("PubChem");
+        Label pubchemLink = new Label("PUBCHEM");
         pubchemLink.addCssClass("homepage-link");
         links.append(pubchemLink);
 

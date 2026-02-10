@@ -117,7 +117,7 @@ SourceSection[] extractSections(Page[] pages)
                 {
                     if (isExcluded(sec.heading))
                         continue;
-                    currentContent ~= "\n\n===" ~ sec.heading ~ "===\n" ~ sec.content;
+                    currentContent ~= "\n\n==="~sec.heading~"===\n"~sec.content;
                     subCount++;
                 }
                 else
@@ -149,7 +149,7 @@ void embedAll(SourceSection[] sections)
     foreach (ref s; sections)
     {
         texts ~= s.heading.toLower;
-        texts ~= s.content[0 .. min($, 300)];
+        texts ~= s.content[0..min($, 300)];
     }
 
     try
@@ -181,7 +181,7 @@ SourceSection[][] groupSections(SourceSection[] sections)
     bool[] assigned = new bool[sections.length];
     SourceSection[][] groups;
 
-    foreach (i; 0 .. sections.length)
+    foreach (i; 0..sections.length)
     {
         if (assigned[i])
             continue;
@@ -190,7 +190,7 @@ SourceSection[][] groupSections(SourceSection[] sections)
         group ~= sections[i];
         assigned[i] = true;
 
-        foreach (j; i + 1 .. sections.length)
+        foreach (j; i + 1..sections.length)
         {
             if (assigned[j])
                 continue;
@@ -247,7 +247,7 @@ Section resolveGroup(SourceSection[] group)
     bool allSimilar = true;
     if (group[0].contentEmbedding.length > 0)
     {
-        foreach (i; 1 .. group.length)
+        foreach (i; 1..group.length)
         {
             if (group[i].contentEmbedding.length == 0)
             {
@@ -270,7 +270,7 @@ Section resolveGroup(SourceSection[] group)
     {
         writeln("[Ease]   -> Near-duplicate, picking longest");
         SourceSection best = group[0];
-        foreach (i; 1 .. group.length)
+        foreach (i; 1..group.length)
         {
             if (group[i].content.length > best.content.length)
                 best = group[i];
@@ -291,18 +291,18 @@ Section mergeViaLLM(string heading, int level, SourceSection[] group)
     {
         int allowed = cfg.maxMergeChars / cast(int) group.length;
         string text = s.content.length > allowed
-            ? s.content[0 .. allowed] : s.content;
-        parts ~= "[" ~ s.origin ~ "]\n" ~ text;
+            ? s.content[0..allowed] : s.content;
+        parts ~= "["~s.origin~"]\n"~text;
         totalLen += cast(int) text.length;
     }
 
     string combined = parts.join("\n\n---\n\n");
 
-    string prompt = "Merge these texts about \"" ~ heading
-        ~ "\" into one cohesive section. "
-        ~ "Preserve ALL facts from every source. "
-        ~ "No headings, no citations, encyclopedic prose only.\n\n"
-        ~ combined;
+    string prompt = "Merge these texts about \""~heading
+       ~"\" into one cohesive section. "
+       ~"Preserve ALL facts from every source. "
+       ~"No headings, no citations, encyclopedic prose only.\n\n"
+       ~combined;
 
     try
     {
@@ -316,7 +316,7 @@ Section mergeViaLLM(string heading, int level, SourceSection[] group)
         sysMsg["role"] = JSONValue("system");
         sysMsg["content"] = JSONValue(
             "Merge encyclopedia sections preserving all facts. "
-            ~ "Output only merged text. /no_think");
+           ~"Output only merged text. /no_think");
         messages.array ~= sysMsg;
 
         JSONValue userMsg = JSONValue.emptyObject;
@@ -385,7 +385,7 @@ void ease(
     {
         string sources;
         foreach (ref s; group)
-            sources ~= s.origin ~ " ";
+            sources ~= s.origin~" ";
         writeln("[Ease] Resolving ", i + 1, "/", groups.length,
             ": '", group[0].heading, "' (", group.length,
             " sources: ", sources.strip, ")");

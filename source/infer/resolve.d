@@ -39,7 +39,7 @@ bool hasDrugSuffix(string word)
 
     foreach (suf; suffixes)
     {
-        if (lower.length > suf.length && lower[$ - suf.length .. $] == suf)
+        if (lower.length > suf.length && lower[$ - suf.length..$] == suf)
             return true;
     }
     return false;
@@ -53,7 +53,7 @@ string[] extractCompoundNames(string text)
     if (!cfg.autoResolveRabbitHoles)
         return [];
 
-    string trunc = text.length > 2000 ? text[0 .. 2000] : text;
+    string trunc = text.length > 2000 ? text[0..2000] : text;
     bool[string] names;
 
     // Suffix-matched drug names (e.g. ketamine, phencyclidine, midazolam)

@@ -6,15 +6,14 @@ import std.algorithm : canFind;
 import std.array : join;
 
 import gtk.box;
+import gtk.image;
 import gtk.label;
 import gtk.button;
 import gtk.check_button;
 import gtk.entry;
 import gtk.stack;
 import gtk.window;
-import gtk.menu_button;
-import gtk.popover;
-import gtk.types : Orientation, Align;
+import gtk.types : Orientation, Align, InputPurpose;
 import gtk.widget : Widget;
 
 import infer.config;
@@ -23,6 +22,7 @@ class SettingsWindow : Window
 {
 private:
     Entry endpointEntry;
+    Entry apiKeyEntry;
     Entry chatModelEntry;
     Entry embedModelEntry;
     Entry groupThreshEntry;
@@ -30,16 +30,14 @@ private:
     CheckButton rabbitHolesCheck;
     CheckButton srcWikipediaCheck;
     CheckButton srcPsychonautCheck;
-    MenuButton srcDropdown;
-    Label srcDropdownLabel;
     Window parent;
 
     Button[] tabButtons;
     Stack contentStack;
 
-    Box buildRow(string labelText, Widget field)
+    Box buildEntryRow(string labelText, Entry field, string placeholder = "")
     {
-        Box row = new Box(Orientation.Horizontal, 8);
+        Box row = new Box(Orientation.Vertical, 2);
         row.addCssClass("settings-row");
         row.hexpand = true;
         row.halign = Align.Fill;
@@ -47,20 +45,26 @@ private:
         Label lbl = new Label(labelText);
         lbl.addCssClass("settings-label");
         lbl.halign = Align.Start;
-        lbl.widthRequest = 140;
         row.append(lbl);
 
+        field.addCssClass("settings-entry");
         field.hexpand = true;
         field.halign = Align.Fill;
+        if (placeholder.length > 0)
+            field.placeholderText = placeholder;
         row.append(field);
 
         return row;
     }
 
-    Box buildEntryRow(string labelText, Entry field)
+    static Label buildSectionTitle(string text)
     {
-        field.addCssClass("settings-entry");
-        return buildRow(labelText, field);
+        Label title = new Label(text);
+        title.addCssClass("settings-section-title");
+        title.halign = Align.Start;
+        title.marginTop = 12;
+        title.marginBottom = 4;
+        return title;
     }
 
     void selectTab(int index)
@@ -88,41 +92,69 @@ private:
 
         InferConfig cfg = config();
 
+        // --- Local AI ---
+        tab.append(buildSectionTitle("Local AI"));
+
         endpointEntry = new Entry();
         endpointEntry.text = cfg.endpoint;
-        tab.append(buildEntryRow("Endpoint", endpointEntry));
+        tab.append(buildEntryRow("Endpoint", endpointEntry, "http://127.0.0.1:1234/"));
+
+        apiKeyEntry = new Entry();
+        if (cfg.apiKey.length > 0)
+            apiKeyEntry.text = cfg.apiKey;
+        apiKeyEntry.inputPurpose = InputPurpose.Password;
+        apiKeyEntry.visibility = false;
+        tab.append(buildEntryRow("API Key", apiKeyEntry, "sk-... (optional for local)"));
 
         chatModelEntry = new Entry();
         chatModelEntry.text = cfg.chatModel;
-        tab.append(buildEntryRow("Chat Model", chatModelEntry));
+        tab.append(buildEntryRow("Chat Model", chatModelEntry, "model name or path"));
 
         embedModelEntry = new Entry();
         embedModelEntry.text = cfg.embedModel;
-        tab.append(buildEntryRow("Embed Model", embedModelEntry));
+        tab.append(buildEntryRow("Embed Model", embedModelEntry, "embedding model name"));
 
         groupThreshEntry = new Entry();
         groupThreshEntry.text = cfg.groupingThreshold.to!string;
-        tab.append(buildEntryRow("Group Threshold", groupThreshEntry));
+        tab.append(buildEntryRow("Group Threshold", groupThreshEntry, "0.75"));
 
         dedupeThreshEntry = new Entry();
         dedupeThreshEntry.text = cfg.dedupeThreshold.to!string;
-        tab.append(buildEntryRow("Dedup Threshold", dedupeThreshEntry));
+        tab.append(buildEntryRow("Dedup Threshold", dedupeThreshEntry, "0.92"));
+
+        // --- Interface ---
+        tab.append(buildSectionTitle("Interface"));
 
         rabbitHolesCheck = new CheckButton();
         rabbitHolesCheck.label = "Auto resolve rabbit-holes";
         rabbitHolesCheck.active = cfg.autoResolveRabbitHoles;
-        rabbitHolesCheck.marginTop = 8;
+        rabbitHolesCheck.marginTop = 4;
         tab.append(rabbitHolesCheck);
 
         return tab;
     }
 
-    void updateDropdownLabel()
+    Box buildSourceRow(string iconPath, string sourceName, ref CheckButton check, bool active)
     {
-        string[] active;
-        if (srcWikipediaCheck.active) active ~= "Wikipedia";
-        if (srcPsychonautCheck.active) active ~= "Psychonaut Wiki";
-        srcDropdownLabel.label = active.length > 0 ? active.join(", ") : "None";
+        Box row = new Box(Orientation.Horizontal, 8);
+        row.addCssClass("settings-source-row");
+        row.halign = Align.Fill;
+        row.hexpand = true;
+        row.marginStart = 4;
+        row.marginTop = 2;
+        row.marginBottom = 2;
+
+        Image icon = Image.newFromFile(iconPath);
+        icon.pixelSize = 16;
+        row.append(icon);
+
+        check = new CheckButton();
+        check.label = sourceName;
+        check.active = active;
+        check.addCssClass("settings-source-check");
+        row.append(check);
+
+        return row;
     }
 
     Box buildRetrievalTab()
@@ -132,44 +164,15 @@ private:
 
         InferConfig cfg = config();
 
-        // Source dropdown
-        srcDropdownLabel = new Label("");
-        srcDropdownLabel.addCssClass("settings-dropdown-label");
-        srcDropdownLabel.halign = Align.Start;
-        srcDropdownLabel.hexpand = true;
+        tab.append(buildSectionTitle("Sources"));
 
-        srcDropdown = new MenuButton();
-        srcDropdown.addCssClass("settings-dropdown");
-        srcDropdown.alwaysShowArrow = true;
+        tab.append(buildSourceRow(
+            "resources/icons/wikipedia.svg", "Wikipedia",
+            srcWikipediaCheck, cfg.enabledSources.canFind("wikipedia")));
 
-        Popover pop = new Popover();
-        pop.addCssClass("settings-dropdown-popover");
-        Box popContent = new Box(Orientation.Vertical, 2);
-        popContent.marginTop = 8;
-        popContent.marginBottom = 8;
-        popContent.marginStart = 8;
-        popContent.marginEnd = 8;
-
-        srcWikipediaCheck = new CheckButton();
-        srcWikipediaCheck.label = "Wikipedia";
-        srcWikipediaCheck.addCssClass("settings-dropdown-check");
-        srcWikipediaCheck.active = cfg.enabledSources.canFind("wikipedia");
-        srcWikipediaCheck.connectToggled(&updateDropdownLabel);
-        popContent.append(srcWikipediaCheck);
-
-        srcPsychonautCheck = new CheckButton();
-        srcPsychonautCheck.label = "Psychonaut Wiki";
-        srcPsychonautCheck.addCssClass("settings-dropdown-check");
-        srcPsychonautCheck.active = cfg.enabledSources.canFind("psychonaut");
-        srcPsychonautCheck.connectToggled(&updateDropdownLabel);
-        popContent.append(srcPsychonautCheck);
-
-        pop.setChild(popContent);
-        srcDropdown.popover = pop;
-        srcDropdown.child = srcDropdownLabel;
-
-        updateDropdownLabel();
-        tab.append(buildRow("Sources", srcDropdown));
+        tab.append(buildSourceRow(
+            "resources/icons/psychonaut.svg", "Psychonaut Wiki",
+            srcPsychonautCheck, cfg.enabledSources.canFind("psychonaut")));
 
         return tab;
     }
@@ -272,6 +275,7 @@ public:
     {
         InferConfig cfg;
         cfg.endpoint = endpointEntry.text;
+        cfg.apiKey = apiKeyEntry.text;
         cfg.chatModel = chatModelEntry.text;
         cfg.embedModel = embedModelEntry.text;
         cfg.autoResolveRabbitHoles = rabbitHolesCheck.active;

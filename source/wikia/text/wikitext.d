@@ -65,14 +65,14 @@ private struct WikitextParser
             }
 
             // Redirect
-            if (pos + 9 < src.length && src[pos .. pos + 9] == "#REDIRECT")
+            if (pos + 9 < src.length && src[pos..pos + 9] == "#REDIRECT")
             {
                 parseRedirect();
                 continue;
             }
 
             // Horizontal rule
-            if (atLineStart() && remaining() >= 4 && src[pos .. pos + 4] == "----")
+            if (atLineStart() && remaining() >= 4 && src[pos..pos + 4] == "----")
             {
                 size_t end = pos + 4;
                 while (end < src.length && src[end] == '-')
@@ -105,7 +105,7 @@ private struct WikitextParser
             }
 
             // Table
-            if (atLineStart() && remaining() >= 2 && src[pos .. pos + 2] == "{|")
+            if (atLineStart() && remaining() >= 2 && src[pos..pos + 2] == "{|")
             {
                 parseTable();
                 continue;
@@ -148,14 +148,14 @@ private struct WikitextParser
 
             // Block-level template {{ ... }} (handles multi-line templates
             // like {{Infobox ...}} that may contain blank lines).
-            if (remaining() >= 2 && src[pos .. pos + 2] == "{{")
+            if (remaining() >= 2 && src[pos..pos + 2] == "{{")
             {
                 size_t closePos = findMatchingClose(src, pos + 2, "{{", "}}");
                 if (closePos != size_t.max)
                 {
-                    auto tpl = Node(NodeType.Template);
-                    tpl.text = src[pos + 2 .. closePos];
-                    nodes ~= tpl;
+                    Node templateNode = Node(NodeType.Template);
+                    templateNode.text = src[pos + 2 .. closePos];
+                    nodes ~= templateNode;
                     pos = closePos + 2;
                     skipNewlines();
                     continue;
@@ -207,9 +207,9 @@ private struct WikitextParser
 
         int effectiveLevel = level < closeLevel ? level : closeLevel;
 
-        const(char)[] headingText = src[hStart .. closeStart].strip;
+        const(char)[] headingText = src[hStart..closeStart].strip;
 
-        auto secNode = Node(NodeType.Section);
+        Node secNode = Node(NodeType.Section);
         secNode.level = cast(ubyte) effectiveLevel;
         secNode.text = headingText;
         nodes ~= secNode;
@@ -223,10 +223,8 @@ private struct WikitextParser
 
     void parseList(NodeType listType, char marker)
     {
-        auto listNode = Node(listType);
         uint listIdx = cast(uint) nodes.length;
-        nodes ~= listNode;
-
+        nodes ~= Node(listType);
         uint firstChild = cast(uint) nodes.length;
 
         while (pos < src.length && atLineStart() && peek() == marker)
@@ -237,16 +235,16 @@ private struct WikitextParser
             pos += depth;
 
             size_t lineEnd = findLineEnd(pos);
-            const(char)[] content = src[pos .. lineEnd].strip;
+            const(char)[] content = src[pos..lineEnd].strip;
             pos = lineEnd;
             skipNewlines();
 
-            auto item = Node(NodeType.ListItem);
-            item.level = cast(ubyte) depth;
+            Node itemNode = Node(NodeType.ListItem);
+            itemNode.level = cast(ubyte) depth;
 
             // Parse inline content of the list item.
             uint itemIdx = cast(uint) nodes.length;
-            nodes ~= item;
+            nodes ~= itemNode;
             uint inlineStart = cast(uint) nodes.length;
             parseInlineInto(content);
             nodes[itemIdx].childStart = inlineStart;
@@ -261,32 +259,30 @@ private struct WikitextParser
 
     void parseDefinitionList()
     {
-        auto dlNode = Node(NodeType.DefinitionList);
-        uint dlIdx = cast(uint) nodes.length;
-        nodes ~= dlNode;
+        uint defListIdx = cast(uint) nodes.length;
+        nodes ~= Node(NodeType.DefinitionList);
         uint firstChild = cast(uint) nodes.length;
 
         while (pos < src.length && atLineStart() && (peek() == ';' || peek() == ':'))
         {
-            char c = src[pos];
+            char marker = src[pos];
             pos++;
             size_t lineEnd = findLineEnd(pos);
-            const(char)[] content = src[pos .. lineEnd].strip;
+            const(char)[] content = src[pos..lineEnd].strip;
             pos = lineEnd;
             skipNewlines();
 
-            NodeType nt = c == ';' ? NodeType.DefinitionTerm : NodeType.DefinitionDesc;
-            auto item = Node(nt);
+            auto nodeType = marker == ';' ? NodeType.DefinitionTerm : NodeType.DefinitionDesc;
             uint itemIdx = cast(uint) nodes.length;
-            nodes ~= item;
+            nodes ~= Node(nodeType);
             uint inlineStart = cast(uint) nodes.length;
             parseInlineInto(content);
             nodes[itemIdx].childStart = inlineStart;
             nodes[itemIdx].childEnd = cast(uint) nodes.length;
         }
 
-        nodes[dlIdx].childStart = firstChild;
-        nodes[dlIdx].childEnd = cast(uint) nodes.length;
+        nodes[defListIdx].childStart = firstChild;
+        nodes[defListIdx].childEnd = cast(uint) nodes.length;
     }
 
     // --- Tables ---
@@ -299,14 +295,13 @@ private struct WikitextParser
         pos = lineEnd;
         skipNewlines();
 
-        auto tableNode = Node(NodeType.Table);
         uint tableIdx = cast(uint) nodes.length;
-        nodes ~= tableNode;
+        nodes ~= Node(NodeType.Table);
         uint firstChild = cast(uint) nodes.length;
 
         while (pos < src.length)
         {
-            if (remaining() >= 2 && src[pos .. pos + 2] == "|}")
+            if (remaining() >= 2 && src[pos..pos + 2] == "|}")
             {
                 pos += 2;
                 skipNewlines();
@@ -314,20 +309,20 @@ private struct WikitextParser
             }
 
             // Caption
-            if (remaining() >= 2 && src[pos .. pos + 2] == "|+")
+            if (remaining() >= 2 && src[pos..pos + 2] == "|+")
             {
                 pos += 2;
                 lineEnd = findLineEnd(pos);
-                auto cap = Node(NodeType.TableCaption);
-                cap.text = src[pos .. lineEnd].strip;
-                nodes ~= cap;
+                Node captionNode = Node(NodeType.TableCaption);
+                captionNode.text = src[pos .. lineEnd].strip;
+                nodes ~= captionNode;
                 pos = lineEnd;
                 skipNewlines();
                 continue;
             }
 
             // Row separator
-            if (remaining() >= 2 && src[pos .. pos + 2] == "|-")
+            if (remaining() >= 2 && src[pos..pos + 2] == "|-")
             {
                 pos += 2;
                 lineEnd = findLineEnd(pos);
@@ -357,15 +352,14 @@ private struct WikitextParser
 
     void parseTableRow()
     {
-        auto rowNode = Node(NodeType.TableRow);
         uint rowIdx = cast(uint) nodes.length;
-        nodes ~= rowNode;
+        nodes ~= Node(NodeType.TableRow);
         uint firstChild = cast(uint) nodes.length;
 
         while (pos < src.length)
         {
             // End of table or next row.
-            if (remaining() >= 2 && (src[pos .. pos + 2] == "|}" || src[pos .. pos + 2] == "|-"))
+            if (remaining() >= 2 && (src[pos..pos + 2] == "|}" || src[pos..pos + 2] == "|-"))
                 break;
 
             bool isHeader = (peek() == '!');
@@ -384,10 +378,28 @@ private struct WikitextParser
 
     void parseTableCells(bool isHeader)
     {
+        // Collect the first line of cell content.
         size_t lineEnd = findLineEnd(pos);
         const(char)[] line = src[pos .. lineEnd];
         pos = lineEnd;
         skipNewlines();
+
+        // Collect continuation lines (not starting with |, !, or table markup).
+        while (pos < src.length)
+        {
+            if (remaining() >= 2
+                && (src[pos .. pos + 2] == "|}"
+                    || src[pos .. pos + 2] == "|-"
+                    || src[pos .. pos + 2] == "|+"))
+                break;
+            if (peek() == '|' || peek() == '!')
+                break;
+
+            lineEnd = findLineEnd(pos);
+            line = line ~ "\n" ~ src[pos .. lineEnd];
+            pos = lineEnd;
+            skipNewlines();
+        }
 
         // Cells can be separated by || or !!
         const(char)[] sep = isHeader ? "!!" : "||";
@@ -408,20 +420,77 @@ private struct WikitextParser
                 cellStart += sepIdx + sep.length;
             }
 
-            // Strip attributes (text after last '|' if present, but not '||')
-            auto pipeIdx = sliceIndexOf(cellText, "|");
+            // Strip cell attributes: find the first '|' that is NOT inside
+            // [[ ]], {{ }}, or a wikilink/template. Only that leading pipe
+            // separates attributes from display content.
+            size_t pipeIdx = findAttributePipe(cellText);
             if (pipeIdx != size_t.max)
                 cellText = cellText[pipeIdx + 1 .. $];
 
-            NodeType ct = isHeader ? NodeType.TableHeader : NodeType.TableCell;
-            auto cell = Node(ct);
+            auto cellType = isHeader ? NodeType.TableHeader : NodeType.TableCell;
             uint cellIdx = cast(uint) nodes.length;
-            nodes ~= cell;
+            nodes ~= Node(cellType);
             uint inlineStart = cast(uint) nodes.length;
             parseInlineInto(cellText.strip);
             nodes[cellIdx].childStart = inlineStart;
             nodes[cellIdx].childEnd = cast(uint) nodes.length;
         }
+    }
+
+    /// Find the attribute-separating '|' in cell text, skipping over
+    /// pipes that are inside [[ ]], {{ }}, or <ref>...</ref> markup.
+    static size_t findAttributePipe(const(char)[] text)
+    {
+        int bracketDepth = 0;  // [[ ]]
+        int braceDepth = 0;    // {{ }}
+        int angleDepth = 0;    // < >
+
+        for (size_t j = 0; j < text.length; j++)
+        {
+            if (j + 1 < text.length && text[j] == '[' && text[j + 1] == '[')
+            {
+                bracketDepth++;
+                j++;
+                continue;
+            }
+            if (j + 1 < text.length && text[j] == ']' && text[j + 1] == ']')
+            {
+                if (bracketDepth > 0)
+                    bracketDepth--;
+                j++;
+                continue;
+            }
+            if (j + 1 < text.length && text[j] == '{' && text[j + 1] == '{')
+            {
+                braceDepth++;
+                j++;
+                continue;
+            }
+            if (j + 1 < text.length && text[j] == '}' && text[j + 1] == '}')
+            {
+                if (braceDepth > 0)
+                    braceDepth--;
+                j++;
+                continue;
+            }
+            if (text[j] == '<')
+            {
+                angleDepth++;
+                continue;
+            }
+            if (text[j] == '>')
+            {
+                if (angleDepth > 0)
+                    angleDepth--;
+                continue;
+            }
+
+            // A bare '|' outside of any nesting is the attribute separator.
+            if (text[j] == '|' && bracketDepth == 0
+                && braceDepth == 0 && angleDepth == 0)
+                return j;
+        }
+        return size_t.max;
     }
 
     // --- Preformatted ---
@@ -435,9 +504,9 @@ private struct WikitextParser
             pos++; // skip leading space
             size_t lineEnd = findLineEnd(pos);
             if (content.length > 0)
-                content = content ~ "\n" ~ src[pos .. lineEnd];
+                content = content~"\n"~src[pos..lineEnd];
             else
-                content = src[pos .. lineEnd];
+                content = src[pos..lineEnd];
             pos = lineEnd;
             if (pos < src.length && src[pos] == '\n')
                 pos++;
@@ -445,13 +514,12 @@ private struct WikitextParser
 
         if (content.length > 0)
         {
-            auto pNode = Node(NodeType.Paragraph);
-            uint pIdx = cast(uint) nodes.length;
-            nodes ~= pNode;
+            uint paragraphIdx = cast(uint) nodes.length;
+            nodes ~= Node(NodeType.Paragraph);
             uint childStart = cast(uint) nodes.length;
             parseInlineInto(content);
-            nodes[pIdx].childStart = childStart;
-            nodes[pIdx].childEnd = cast(uint) nodes.length;
+            nodes[paragraphIdx].childStart = childStart;
+            nodes[paragraphIdx].childEnd = cast(uint) nodes.length;
         }
     }
 
@@ -475,12 +543,12 @@ private struct WikitextParser
         size_t endIdx = indexOfStr(pos, "</nowiki>");
         if (endIdx == size_t.max)
         {
-            nodes ~= Node(NodeType.NoWiki, src[pos .. $]);
+            nodes ~= Node(NodeType.NoWiki, src[pos..$]);
             pos = src.length;
         }
         else
         {
-            nodes ~= Node(NodeType.NoWiki, src[pos .. endIdx]);
+            nodes ~= Node(NodeType.NoWiki, src[pos..endIdx]);
             pos = endIdx + 9;
         }
     }
@@ -497,17 +565,17 @@ private struct WikitextParser
         size_t endIdx = indexOfStr(pos, "</math>");
         if (endIdx == size_t.max)
         {
-            nodes ~= Node(NodeType.Math, src[pos .. $]);
+            nodes ~= Node(NodeType.Math, src[pos..$]);
             pos = src.length;
         }
         else
         {
-            nodes ~= Node(NodeType.Math, src[pos .. endIdx]);
+            nodes ~= Node(NodeType.Math, src[pos..endIdx]);
             pos = endIdx + 7;
         }
     }
 
-    void parseHtmlBlock(string tag, NodeType nt)
+    void parseHtmlBlock(string tag, NodeType nodeType)
     {
         size_t tagEnd = indexOfChar(pos, '>');
         if (tagEnd == size_t.max)
@@ -516,24 +584,23 @@ private struct WikitextParser
             return;
         }
         pos = tagEnd + 1;
-        string closeTag = "</" ~ tag ~ ">";
+        string closeTag = "</"~tag~">";
         size_t endIdx = indexOfStr(pos, closeTag);
         if (endIdx == size_t.max)
         {
-            auto n = Node(nt);
-            n.text = src[pos .. $];
-            nodes ~= n;
+            Node blockNode = Node(nodeType);
+            blockNode.text = src[pos .. $];
+            nodes ~= blockNode;
             pos = src.length;
         }
         else
         {
-            auto n = Node(nt);
-            uint nIdx = cast(uint) nodes.length;
-            nodes ~= n;
+            uint blockIdx = cast(uint) nodes.length;
+            nodes ~= Node(nodeType);
             uint childStart = cast(uint) nodes.length;
-            parseInlineInto(src[pos .. endIdx]);
-            nodes[nIdx].childStart = childStart;
-            nodes[nIdx].childEnd = cast(uint) nodes.length;
+            parseInlineInto(src[pos..endIdx]);
+            nodes[blockIdx].childStart = childStart;
+            nodes[blockIdx].childEnd = cast(uint) nodes.length;
             pos = endIdx + closeTag.length;
         }
     }
@@ -548,17 +615,17 @@ private struct WikitextParser
             return;
         }
         // "Category:Name|Sortkey"
-        const(char)[] inner = src[pos .. close];
+        const(char)[] inner = src[pos..close];
         // Skip "Category:"
         size_t colon = sliceIndexOf(inner, ":");
         if (colon != size_t.max)
-            inner = inner[colon + 1 .. $];
-        auto pipeIdx = sliceIndexOf(inner, "|");
+            inner = inner[colon + 1..$];
+        size_t pipeIdx = sliceIndexOf(inner, "|");
         const(char)[] name = pipeIdx != size_t.max ? inner[0 .. pipeIdx] : inner;
 
-        auto cat = Node(NodeType.Category);
-        cat.text = name.strip;
-        nodes ~= cat;
+        Node categoryNode = Node(NodeType.Category);
+        categoryNode.text = name.strip;
+        nodes ~= categoryNode;
         pos = close + 2;
         skipNewlines();
     }
@@ -574,12 +641,12 @@ private struct WikitextParser
             pos = src.length;
             return;
         }
-        const(char)[] target = src[pos .. close];
-        if (target.length >= 2 && target[0 .. 2] == "[[")
-            target = target[2 .. $];
-        auto rd = Node(NodeType.Redirect);
-        rd.target = target.strip;
-        nodes ~= rd;
+        const(char)[] target = src[pos..close];
+        if (target.length >= 2 && target[0..2] == "[[")
+            target = target[2..$];
+        Node redirectNode = Node(NodeType.Redirect);
+        redirectNode.target = target.strip;
+        nodes ~= redirectNode;
         pos = close + 2;
     }
 
@@ -596,7 +663,7 @@ private struct WikitextParser
         if (src[tagEnd - 1] == '/' || (tagEnd >= 2 && src[tagEnd - 1] == ' '
             && tagEnd >= pos + 1 && src[tagEnd - 2] == '/'))
         {
-            auto refNode = Node(NodeType.Reference);
+            Node refNode = Node(NodeType.Reference);
             refNode.text = src[pos .. tagEnd + 1];
             nodes ~= refNode;
             pos = tagEnd + 1;
@@ -608,7 +675,7 @@ private struct WikitextParser
         size_t endRef = indexOfStr(tagEnd + 1, "</ref>");
         if (endRef != size_t.max)
         {
-            auto refNode = Node(NodeType.Reference);
+            Node refNode = Node(NodeType.Reference);
             refNode.text = src[tagEnd + 1 .. endRef];
             nodes ~= refNode;
             pos = endRef + 6;
@@ -631,14 +698,15 @@ private struct WikitextParser
         while (pos < src.length)
         {
             // Track <ref> open/close to avoid splitting refs.
-            if (pos + 5 < src.length && src[pos .. pos + 4] == "<ref"
+            if (pos + 5 < src.length && src[pos..pos + 4] == "<ref"
                 && (src[pos + 4] == '>' || src[pos + 4] == ' '))
             {
                 refDepth++;
             }
-            if (pos + 6 <= src.length && src[pos .. pos + 6] == "</ref>")
+            if (pos + 6 <= src.length && src[pos..pos + 6] == "</ref>")
             {
-                if (refDepth > 0) refDepth--;
+                if (refDepth > 0)
+                    refDepth--;
                 pos += 6;
                 continue;
             }
@@ -667,12 +735,12 @@ private struct WikitextParser
                         break;
                     if (pos + 2 < src.length)
                     {
-                        if (src[pos + 1 .. pos + 3] == "{|" ||
-                            src[pos + 1 .. pos + 3] == "|}")
+                        if (src[pos + 1..pos + 3] == "{|" ||
+                            src[pos + 1..pos + 3] == "|}")
                             break;
                     }
                     if (pos + 10 < src.length
-                        && src[pos + 1 .. pos + 10] == "#REDIRECT")
+                        && src[pos + 1..pos + 10] == "#REDIRECT")
                         break;
                 }
             }
@@ -681,16 +749,15 @@ private struct WikitextParser
 
         if (pos > start)
         {
-            const(char)[] content = src[start .. pos].strip;
+            const(char)[] content = src[start..pos].strip;
             if (content.length > 0)
             {
-                auto pNode = Node(NodeType.Paragraph);
-                uint pIdx = cast(uint) nodes.length;
-                nodes ~= pNode;
+                uint paragraphIdx = cast(uint) nodes.length;
+                nodes ~= Node(NodeType.Paragraph);
                 uint childStart = cast(uint) nodes.length;
                 parseInlineInto(content);
-                nodes[pIdx].childStart = childStart;
-                nodes[pIdx].childEnd = cast(uint) nodes.length;
+                nodes[paragraphIdx].childStart = childStart;
+                nodes[paragraphIdx].childEnd = cast(uint) nodes.length;
             }
         }
 
@@ -711,28 +778,28 @@ private struct WikitextParser
         {
             if (i > textStart)
             {
-                auto t = Node(NodeType.Text);
-                t.text = text[textStart .. i];
-                nodes ~= t;
+                Node textNode = Node(NodeType.Text);
+                textNode.text = text[textStart .. i];
+                nodes ~= textNode;
             }
         }
 
         while (i < text.length)
         {
             // HTML comment
-            if (i + 4 < text.length && text[i .. i + 4] == "<!--")
+            if (i + 4 < text.length && text[i..i + 4] == "<!--")
             {
                 flushText();
-                size_t end = sliceIndexOf(text[i + 4 .. $], "-->");
+                size_t end = sliceIndexOf(text[i + 4..$], "-->");
                 if (end == size_t.max)
                 {
-                    nodes ~= Node(NodeType.Comment, text[i + 4 .. $]);
+                    nodes ~= Node(NodeType.Comment, text[i + 4..$]);
                     textStart = text.length;
                     i = text.length;
                 }
                 else
                 {
-                    nodes ~= Node(NodeType.Comment, text[i + 4 .. i + 4 + end]);
+                    nodes ~= Node(NodeType.Comment, text[i + 4..i + 4 + end]);
                     i = i + 4 + end + 3;
                     textStart = i;
                 }
@@ -751,9 +818,9 @@ private struct WikitextParser
                 }
                 else
                 {
-                    auto tpl = Node(NodeType.Template);
-                    tpl.text = text[i + 2 .. end];
-                    nodes ~= tpl;
+                    Node templateNode = Node(NodeType.Template);
+                    templateNode.text = text[i + 2 .. end];
+                    nodes ~= templateNode;
                     i = end + 2;
                     textStart = i;
                 }
@@ -772,51 +839,51 @@ private struct WikitextParser
                     continue;
                 }
 
-                const(char)[] inner = text[i + 2 .. close];
+                const(char)[] inner = text[i + 2..close];
                 i = close + 2;
                 textStart = i;
 
                 // Category [[Category:...]]
-                if (inner.length > 9 && (inner[0 .. 9] == "Category:" || inner[0 .. 9] == "category:"))
+                if (inner.length > 9 && (inner[0..9] == "Category:" || inner[0..9] == "category:"))
                 {
-                    auto cat = Node(NodeType.Category);
-                    auto pipeIdx = sliceIndexOf(inner[9 .. $], "|");
-                    cat.text = pipeIdx != size_t.max
-                        ? inner[9 .. 9 + pipeIdx].strip
-                        : inner[9 .. $].strip;
-                    nodes ~= cat;
+                    Node categoryNode = Node(NodeType.Category);
+                    size_t pipeIdx = sliceIndexOf(inner[9 .. $], "|");
+                    categoryNode.text = pipeIdx != size_t.max
+                        ? inner[9..9 + pipeIdx].strip
+                        : inner[9..$].strip;
+                    nodes ~= categoryNode;
                     continue;
                 }
 
                 // File/Image [[File:...]] [[Image:...]]
-                if ((inner.length > 5 && (inner[0 .. 5] == "File:" || inner[0 .. 5] == "file:")) ||
-                    (inner.length > 6 && (inner[0 .. 6] == "Image:" || inner[0 .. 6] == "image:")))
+                if ((inner.length > 5 && (inner[0..5] == "File:" || inner[0..5] == "file:")) ||
+                    (inner.length > 6 && (inner[0..6] == "Image:" || inner[0..6] == "image:")))
                 {
-                    auto img = Node(NodeType.Image);
+                    Node imageNode = Node(NodeType.Image);
                     size_t colon = sliceIndexOf(inner, ":");
-                    img.target = colon != size_t.max ? inner[colon + 1 .. $] : inner;
+                    imageNode.target = colon != size_t.max ? inner[colon + 1..$] : inner;
                     // Extract display text (last pipe-separated field).
-                    auto pipeIdx = sliceLastIndexOf(inner, "|");
+                    size_t pipeIdx = sliceLastIndexOf(inner, "|");
                     if (pipeIdx != size_t.max)
-                        img.text = inner[pipeIdx + 1 .. $].strip;
-                    nodes ~= img;
+                        imageNode.text = inner[pipeIdx + 1..$].strip;
+                    nodes ~= imageNode;
                     continue;
                 }
 
                 // Regular wikilink
-                auto link = Node(NodeType.Link);
-                auto pipeIdx = sliceIndexOf(inner, "|");
+                Node linkNode = Node(NodeType.Link);
+                size_t pipeIdx = sliceIndexOf(inner, "|");
                 if (pipeIdx != size_t.max)
                 {
-                    link.target = inner[0 .. pipeIdx].strip;
-                    link.text = inner[pipeIdx + 1 .. $].strip;
+                    linkNode.target = inner[0..pipeIdx].strip;
+                    linkNode.text = inner[pipeIdx + 1..$].strip;
                 }
                 else
                 {
-                    link.target = inner.strip;
-                    link.text = inner.strip;
+                    linkNode.target = inner.strip;
+                    linkNode.text = inner.strip;
                 }
-                nodes ~= link;
+                nodes ~= linkNode;
                 continue;
             }
 
@@ -825,27 +892,27 @@ private struct WikitextParser
             {
                 // Check if it looks like a URL.
                 if (i + 8 < text.length &&
-                    (text[i + 1 .. i + 8] == "http://" ||
-                     (i + 9 < text.length && text[i + 1 .. i + 9] == "https://")))
+                    (text[i + 1..i + 8] == "http://" ||
+                     (i + 9 < text.length && text[i + 1..i + 9] == "https://")))
                 {
                     flushText();
-                    size_t close = sliceIndexOf(text[i + 1 .. $], "]");
+                    size_t close = sliceIndexOf(text[i + 1..$], "]");
                     if (close != size_t.max)
                     {
-                        const(char)[] inner = text[i + 1 .. i + 1 + close];
-                        auto spaceIdx = sliceIndexOf(inner, " ");
-                        auto el = Node(NodeType.ExtLink);
+                        const(char)[] inner = text[i + 1..i + 1 + close];
+                        size_t spaceIdx = sliceIndexOf(inner, " ");
+                        Node extLinkNode = Node(NodeType.ExtLink);
                         if (spaceIdx != size_t.max)
                         {
-                            el.target = inner[0 .. spaceIdx];
-                            el.text = inner[spaceIdx + 1 .. $].strip;
+                            extLinkNode.target = inner[0..spaceIdx];
+                            extLinkNode.text = inner[spaceIdx + 1..$].strip;
                         }
                         else
                         {
-                            el.target = inner;
-                            el.text = inner;
+                            extLinkNode.target = inner;
+                            extLinkNode.text = inner;
                         }
-                        nodes ~= el;
+                        nodes ~= extLinkNode;
                         i = i + 1 + close + 1;
                         textStart = i;
                         continue;
@@ -866,37 +933,39 @@ private struct WikitextParser
                     i++;
                 }
 
-                NodeType nt;
+                NodeType formatType;
                 if (quoteCount >= 5)
-                    nt = NodeType.BoldItalic;
+                    formatType = NodeType.BoldItalic;
                 else if (quoteCount >= 3)
-                    nt = NodeType.Bold;
+                    formatType = NodeType.Bold;
                 else
-                    nt = NodeType.Italic;
+                    formatType = NodeType.Italic;
 
                 // Find matching closing quotes.
                 int closeQuotes = quoteCount >= 5 ? 5 : quoteCount >= 3 ? 3 : 2;
                 string closeStr;
-                if (closeQuotes == 5) closeStr = "'''''";
-                else if (closeQuotes == 3) closeStr = "'''";
-                else closeStr = "''";
+                if (closeQuotes == 5)
+                    closeStr = "'''''";
+                else if (closeQuotes == 3)
+                    closeStr = "'''";
+                else
+                    closeStr = "''";
 
-                size_t closeIdx = sliceIndexOf(text[i .. $], closeStr);
+                size_t closeIdx = sliceIndexOf(text[i..$], closeStr);
                 if (closeIdx == size_t.max)
                 {
                     // No matching close; treat quotes as text.
-                    auto t = Node(NodeType.Text);
-                    t.text = text[qStart .. i];
-                    nodes ~= t;
+                    Node textNode = Node(NodeType.Text);
+                    textNode.text = text[qStart .. i];
+                    nodes ~= textNode;
                     textStart = i;
                     continue;
                 }
 
-                auto fmtNode = Node(nt);
                 uint fmtIdx = cast(uint) nodes.length;
-                nodes ~= fmtNode;
+                nodes ~= Node(formatType);
                 uint childStart = cast(uint) nodes.length;
-                parseInlineInto(text[i .. i + closeIdx]);
+                parseInlineInto(text[i..i + closeIdx]);
                 nodes[fmtIdx].childStart = childStart;
                 nodes[fmtIdx].childEnd = cast(uint) nodes.length;
 
@@ -906,11 +975,11 @@ private struct WikitextParser
             }
 
             // <ref>...</ref> (inline reference)
-            if (i + 4 < text.length && text[i .. i + 4] == "<ref")
+            if (i + 4 < text.length && text[i..i + 4] == "<ref")
             {
                 flushText();
                 // Self-closing <ref ... />
-                size_t tagEnd = sliceIndexOf(text[i .. $], ">");
+                size_t tagEnd = sliceIndexOf(text[i..$], ">");
                 if (tagEnd != size_t.max)
                 {
                     // Check for self-closing.
@@ -918,7 +987,7 @@ private struct WikitextParser
                         || (tagEnd >= 2 && text[i + tagEnd - 1] == ' '
                             && text[i + tagEnd - 2] == '/'))
                     {
-                        auto refNode = Node(NodeType.Reference);
+                        Node refNode = Node(NodeType.Reference);
                         refNode.text = text[i .. i + tagEnd + 1];
                         nodes ~= refNode;
                         i = i + tagEnd + 1;
@@ -927,10 +996,10 @@ private struct WikitextParser
                     }
 
                     size_t contentStart = i + tagEnd + 1;
-                    size_t endRef = sliceIndexOf(text[contentStart .. $], "</ref>");
+                    size_t endRef = sliceIndexOf(text[contentStart..$], "</ref>");
                     if (endRef != size_t.max)
                     {
-                        auto refNode = Node(NodeType.Reference);
+                        Node refNode = Node(NodeType.Reference);
                         refNode.text = text[contentStart .. contentStart + endRef];
                         nodes ~= refNode;
                         i = contentStart + endRef + 6;
@@ -945,10 +1014,10 @@ private struct WikitextParser
             }
 
             // <br>, <br/>, <br />
-            if (i + 3 < text.length && text[i .. i + 3] == "<br")
+            if (i + 3 < text.length && text[i..i + 3] == "<br")
             {
                 flushText();
-                size_t tagEnd = sliceIndexOf(text[i .. $], ">");
+                size_t tagEnd = sliceIndexOf(text[i..$], ">");
                 if (tagEnd != size_t.max)
                 {
                     nodes ~= Node(NodeType.LineBreak);
@@ -962,12 +1031,12 @@ private struct WikitextParser
             if (text[i] == '<' && i + 1 < text.length && isAlpha(text[i + 1]))
             {
                 flushText();
-                size_t tagEnd = sliceIndexOf(text[i .. $], ">");
+                size_t tagEnd = sliceIndexOf(text[i..$], ">");
                 if (tagEnd != size_t.max)
                 {
-                    auto ht = Node(NodeType.HtmlTag);
-                    ht.text = text[i .. i + tagEnd + 1];
-                    nodes ~= ht;
+                    Node htmlTagNode = Node(NodeType.HtmlTag);
+                    htmlTagNode.text = text[i .. i + tagEnd + 1];
+                    nodes ~= htmlTagNode;
                     i = i + tagEnd + 1;
                     textStart = i;
                     continue;
@@ -981,9 +1050,9 @@ private struct WikitextParser
                 size_t tagEnd = sliceIndexOf(text[i .. $], ">");
                 if (tagEnd != size_t.max)
                 {
-                    auto ht = Node(NodeType.HtmlTag);
-                    ht.text = text[i .. i + tagEnd + 1];
-                    nodes ~= ht;
+                    Node htmlTagNode = Node(NodeType.HtmlTag);
+                    htmlTagNode.text = text[i .. i + tagEnd + 1];
+                    nodes ~= htmlTagNode;
                     i = i + tagEnd + 1;
                     textStart = i;
                     continue;
@@ -996,9 +1065,9 @@ private struct WikitextParser
         // Flush remaining text.
         if (textStart < text.length)
         {
-            auto t = Node(NodeType.Text);
-            t.text = text[textStart .. text.length];
-            nodes ~= t;
+            Node textNode = Node(NodeType.Text);
+            textNode.text = text[textStart .. text.length];
+            nodes ~= textNode;
         }
     }
 
@@ -1126,7 +1195,7 @@ private struct WikitextParser
 
     bool matchAt(string s) const
     {
-        return pos + s.length <= src.length && src[pos .. pos + s.length] == s;
+        return pos + s.length <= src.length && src[pos..pos + s.length] == s;
     }
 
     bool atLineStart() const
@@ -1150,16 +1219,16 @@ private struct WikitextParser
 
     void skipComments()
     {
-        while (pos + 4 < src.length && src[pos .. pos + 4] == "<!--")
+        while (pos + 4 < src.length && src[pos..pos + 4] == "<!--")
         {
             size_t end = indexOfStr(pos + 4, "-->");
             if (end == size_t.max)
             {
-                nodes ~= Node(NodeType.Comment, src[pos + 4 .. $]);
+                nodes ~= Node(NodeType.Comment, src[pos + 4..$]);
                 pos = src.length;
                 return;
             }
-            nodes ~= Node(NodeType.Comment, src[pos + 4 .. end]);
+            nodes ~= Node(NodeType.Comment, src[pos + 4..end]);
             pos = end + 3;
             skipNewlines();
         }
@@ -1177,7 +1246,7 @@ private struct WikitextParser
         if (s.length == 0) return from;
         if (from + s.length > src.length) return size_t.max;
         for (size_t j = from; j + s.length <= src.length; j++)
-            if (src[j .. j + s.length] == s) return j;
+            if (src[j..j + s.length] == s) return j;
         return size_t.max;
     }
 
@@ -1188,7 +1257,7 @@ private struct WikitextParser
         if (needle.length == 0) return 0;
         if (hay.length < needle.length) return size_t.max;
         for (size_t j = 0; j + needle.length <= hay.length; j++)
-            if (hay[j .. j + needle.length] == needle) return j;
+            if (hay[j..j + needle.length] == needle) return j;
         return size_t.max;
     }
 
@@ -1198,7 +1267,7 @@ private struct WikitextParser
         if (hay.length < needle.length) return size_t.max;
         size_t last = size_t.max;
         for (size_t j = 0; j + needle.length <= hay.length; j++)
-            if (hay[j .. j + needle.length] == needle) last = j;
+            if (hay[j..j + needle.length] == needle) last = j;
         return last;
     }
 
@@ -1209,14 +1278,14 @@ private struct WikitextParser
         size_t j = start;
         while (j < text.length)
         {
-            if (j + close.length <= text.length && text[j .. j + close.length] == close)
+            if (j + close.length <= text.length && text[j..j + close.length] == close)
             {
                 depth--;
                 if (depth == 0)
                     return j;
                 j += close.length;
             }
-            else if (j + open.length <= text.length && text[j .. j + open.length] == open)
+            else if (j + open.length <= text.length && text[j..j + open.length] == open)
             {
                 depth++;
                 j += open.length;

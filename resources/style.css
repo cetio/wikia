@@ -75,6 +75,18 @@
 
 .homepage-link {
     color: #3366cc;
+    font-size: 0.8em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.homepage-source {
+    font-size: 0.8em;
+    font-weight: 600;
+    color: #72777d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 /* Search Results */
@@ -85,10 +97,12 @@
 }
 
 .search-results-header {
-    font-size: 1.3em;
-    font-weight: bold;
-    color: #202122;
-    margin-bottom: 16px;
+    font-size: 0.85em;
+    font-weight: 600;
+    color: #72777d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 16px 0 8px 0;
 }
 
 .search-result-row {
@@ -116,8 +130,16 @@
 }
 
 .search-result-detail {
-    font-size: 0.9em;
+    font-size: 0.85em;
     color: #72777d;
+}
+
+.search-result-source {
+    font-size: 0.75em;
+    font-weight: 600;
+    color: #72777d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 /* Loading */
@@ -326,13 +348,54 @@
     padding: 8px 0;
 }
 
-.article-subheading {
-    font-size: 0.95em;
+.article-heading {
+    font-size: 0.85em;
     font-weight: 600;
-    color: #202122;
-    padding: 10px 0 4px 0;
+    color: #72777d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 12px 0 6px 0;
+    margin-top: 8px;
+}
+
+.article-subheading {
+    font-size: 0.85em;
+    font-weight: 600;
+    color: #72777d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 12px 0 6px 0;
+    margin-top: 8px;
     border-bottom: 1px solid #eaecf0;
-    margin-top: 4px;
+}
+
+/* Tables */
+.article-table {
+    margin: 8px 0;
+    border: 1px solid #a2a9b1;
+    background: #f8f9fa;
+}
+
+.article-table-cell {
+    font-size: 0.85em;
+    color: #202122;
+    padding: 4px 8px;
+    border: 1px solid #a2a9b1;
+    background: #ffffff;
+}
+
+.article-table-header {
+    font-weight: 600;
+    background: #eaecf0;
+    border: 1px solid #a2a9b1;
+}
+
+.article-table-caption {
+    font-weight: 600;
+    font-size: 0.9em;
+    color: #202122;
+    padding: 4px 8px;
+    background: #f8f9fa;
 }
 
 .report-section-heading {
@@ -381,21 +444,26 @@
 }
 
 .settings-section-title {
-    font-size: 1.05em;
+    font-size: 0.85em;
     font-weight: 600;
-    color: #202122;
-    margin-bottom: 12px;
+    color: #72777d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
 }
 
 .settings-row {
-    padding: 6px 0;
+    padding: 4px 0;
+}
+
+.settings-source-row {
+    padding: 2px 0;
 }
 
 .settings-label {
-    font-size: 0.9em;
+    font-size: 0.85em;
     font-weight: 500;
-    color: #202122;
-    min-width: 140px;
+    color: #54595d;
 }
 
 .settings-entry {
