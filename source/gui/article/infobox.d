@@ -21,7 +21,6 @@ class Infobox : Overlay
 {
 private:
     Box details;
-    Box secDosage;
 
 public:
     Box subject;
@@ -59,12 +58,6 @@ public:
         buildChemicalSection(secChemical);
         details.append(secChemical);
 
-        secDosage = new Box(Orientation.Vertical, 0);
-        secDosage.hexpand = true;
-        secDosage.halign = Align.Fill;
-        secDosage.visible = false;
-        details.append(secDosage);
-
         details.append(buildLoadingDots());
 
         Box root = new Box(Orientation.Vertical, 0);
@@ -92,12 +85,13 @@ public:
             dosage.source ? dosage.source.name : "primary");
 
         removeLoadingDots();
-        clearBox(secDosage);
+
         if (dosage.dosages.length == 0)
-        {
-            secDosage.visible = false;
             return;
-        }
+
+        Box sec = new Box(Orientation.Vertical, 0);
+        sec.hexpand = true;
+        sec.halign = Align.Fill;
 
         Box secHeader = new Box(Orientation.Horizontal, 4);
         secHeader.addCssClass("infobox-section-header");
@@ -117,7 +111,7 @@ public:
             sourceLabel.tooltipText = "Sourced from a similar compound";
             secHeader.append(sourceLabel);
         }
-        secDosage.append(secHeader);
+        sec.append(secHeader);
 
         foreach (d; dosage.dosages)
         {
@@ -130,14 +124,12 @@ public:
             appendRow(route, "Common", d.common);
             appendRow(route, "Strong", d.strong);
             appendRow(route, "Heavy", d.heavy);
-            
-            secDosage.append(
-                buildCollapsibleSubheading(d.route, route)
-            );
-            secDosage.append(route);
+
+            sec.append(buildCollapsibleSubheading(d.route, route));
+            sec.append(route);
         }
 
-        secDosage.visible = true;
+        details.append(sec);
     }
 
 private:
@@ -210,22 +202,11 @@ private:
     void removeLoadingDots()
     {
         Widget child = details.getLastChild();
-        if (child !is null && child !is secDosage)
+        if (child !is null)
         {
             auto box = cast(Box)child;
             if (box !is null && box.hasCssClass("loading-dots"))
                 details.remove(box);
-        }
-    }
-
-    void clearBox(Box box)
-    {
-        Widget child = box.getFirstChild();
-        while (child !is null)
-        {
-            Widget next = child.getNextSibling();
-            box.remove(child);
-            child = next;
         }
     }
 

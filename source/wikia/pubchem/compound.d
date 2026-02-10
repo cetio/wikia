@@ -41,6 +41,7 @@ package:
 
     Conformer3D _conformer3D;
     string[] _synonyms;
+    string _description;
 
 public:
     int cid;
@@ -95,6 +96,25 @@ public:
             _synonyms = getSynonyms!"cid"(cid)[0];
 
         return _synonyms;
+    }
+
+    string description()
+    {
+        if (_description is null)
+        {
+            auto descs = getDescription!"cid"(cid);
+            foreach (d; descs)
+            {
+                if (d.length > 0)
+                {
+                    _description = d;
+                    break;
+                }
+            }
+            if (_description is null)
+                _description = "";
+        }
+        return _description;
     }
 
     Conformer3D conformer3D()

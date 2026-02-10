@@ -2,6 +2,10 @@ module gui.article.view;
 
 import std.conv : to;
 import std.stdio : writeln;
+import std.regex : ctRegex, replaceAll;
+import std.array : replace;
+import std.string : toLower, strip, indexOf;
+import std.algorithm : canFind;
 import core.thread : Thread;
 
 import gtk.box;
@@ -15,75 +19,18 @@ import gtk.types : Orientation, Align, PolicyType;
 import gtk.widget : Widget;
 
 import gui.article.infobox;
+import gui.article.expander;
+import gui.article.reports : Reports;
 import gui.conformer.view;
+
 import wikia.pubchem;
 import wikia.page : Page, Section, cleanWikitext;
-import wikia.psychonaut : DosageResult, getReports, getPagesByTitle;
+import wikia.psychonaut : DosageResult, resolvePage;
+import infer.ease : ease, SectionCallback, HeadingsCallback;
+import infer.resolve : extractCompoundNames;
+import infer.config : config;
 
-class Expander : Box
-{
-private:
-    Label header;
-    bool expanded;
-    bool firstExpandFired;
-    string _title;
-
-public:
-    Box content;
-    void delegate() onFirstExpand;
-
-    this(string title)
-    {
-        super(Orientation.Vertical, 0);
-        _title = title;
-        addCssClass("expander");
-        hexpand = true;
-        halign = Align.Fill;
-
-        header = new Label(title);
-        header.addCssClass("expander-header");
-        header.halign = Align.Fill;
-        header.xalign = 0;
-
-        GestureClick click = new GestureClick();
-        click.connectReleased((int nPress, double x, double y) {
-            expanded = !expanded;
-            content.visible = expanded;
-            header.label = (expanded ? "▾ " : "▸ ")~_title;
-            if (expanded && !firstExpandFired)
-            {
-                firstExpandFired = true;
-                if (onFirstExpand !is null)
-                    onFirstExpand();
-            }
-        });
-        header.addController(click);
-
-        auto motion = new EventControllerMotion();
-        motion.connectMotion((double x, double y) {
-            if (!header.hasCssClass("expander-header-hover"))
-                header.addCssClass("expander-header-hover");
-        });
-        motion.connectLeave(() {
-            header.removeCssClass("expander-header-hover");
-        });
-        header.addController(motion);
-
-        header.label = "▸ "~title;
-        append(header);
-
-        content = new Box(Orientation.Vertical, 0);
-        content.addCssClass("expander-root");
-        content.hexpand = true;
-        content.visible = false;
-        append(content);
-    }
-
-    void addContent(Widget child)
-    {
-        content.append(child);
-    }
-}
+import gui.loading : makeLoadingDots;
 
 class ArticleView : Overlay
 {
@@ -91,23 +38,22 @@ private:
     ScrolledWindow scroller;
     Box root;
     Box content;
-    Box navBar;
 
     MoleculeView moleculeView;
     Overlay screenOverlay;
 
-    Expander reportsExpander;
-    Compound currentCompound;
+    Box synthesisBody;
+    Compound compound;
+    string[] navHistory;
+    Page[] cachedPages;
 
-    // Report view state
     bool inReportView;
-    Page[] fetchedReports;
-    Page activeReport;
     Box reportView;
 
 public:
     Infobox infobox;
     void delegate() onGoHome;
+    void delegate(string compoundName) onCompoundNavigate;
 
     this()
     {
@@ -143,50 +89,93 @@ public:
         buildOverlay();
     }
 
-    void fromCompound(Compound compound)
+    void fromCompound(Compound compound, bool pushHistory = true)
     {
+        if (pushHistory && this.compound !is null)
+            navHistory ~= this.compound.name;
+
         clearArticle();
         moleculeView.setCompound(compound);
 
-        navBar = new Box(Orientation.Horizontal, 0);
-        navBar.addCssClass("article-nav");
-        navBar.hexpand = true;
-        navBar.halign = Align.Fill;
-        navBar.valign = Align.Start;
+        Box nav = new Box(Orientation.Horizontal, 0);
+        nav.addCssClass("article-nav");
+        nav.hexpand = true;
+        nav.halign = Align.Fill;
+        nav.valign = Align.Start;
+
+        Button backBtn = new Button();
+        backBtn.iconName = "go-previous-symbolic";
+        backBtn.tooltipText = "Back";
+        backBtn.addCssClass("nav-home-button");
+        backBtn.connectClicked(&onBackClicked);
+        backBtn.halign = Align.Start;
+        backBtn.valign = Align.Center;
+        nav.append(backBtn);
 
         Label navTitle = new Label(compound.name);
         navTitle.addCssClass("article-nav-title");
         navTitle.halign = Align.Start;
         navTitle.hexpand = true;
         navTitle.xalign = 0;
-        navBar.append(navTitle);
+        navTitle.marginStart = 8;
+        nav.append(navTitle);
 
         Button homeBtn = new Button();
         homeBtn.iconName = "go-home-symbolic";
         homeBtn.tooltipText = "Back to home";
         homeBtn.addCssClass("nav-home-button");
         homeBtn.connectClicked(() {
+            navHistory = null;
             if (onGoHome !is null) onGoHome();
         });
         homeBtn.halign = Align.End;
         homeBtn.valign = Align.Center;
-        navBar.append(homeBtn);
-        content.append(navBar);
+        nav.append(homeBtn);
+        content.append(nav);
 
-        currentCompound = compound;
-        reportsExpander = new Expander("Reports");
-        reportsExpander.onFirstExpand = &onReportsExpand;
-        content.append(reportsExpander);
+        this.compound = compound;
+
+        synthesisBody = new Box(Orientation.Vertical, 0);
+        synthesisBody.addCssClass("article-content");
+        synthesisBody.hexpand = true;
+        Label loading = new Label("Synthesizing article...");
+        loading.addCssClass("report-body-text");
+        loading.halign = Align.Start;
+        synthesisBody.append(loading);
+        content.append(synthesisBody);
+
+        Thread synthThread = new Thread(&fetchAndSynthesize);
+        synthThread.start();
+
+        Reports reports = new Reports(compound.name);
+        reports.onReportSelected = &fromReport;
+        content.append(reports);
 
         infobox = new Infobox(moleculeView, compound);
         root.append(infobox);
     }
 
-    void addSection(string title, Widget child)
+    void onBackClicked()
     {
-        auto expander = new Expander(title);
-        expander.addContent(child);
-        content.append(expander);
+        if (navHistory.length > 0)
+        {
+            string prev = navHistory[$ - 1];
+            navHistory = navHistory[0 .. $ - 1];
+            if (onCompoundNavigate !is null)
+                onCompoundNavigate(prev);
+        }
+        else
+        {
+            if (onGoHome !is null) onGoHome();
+        }
+    }
+
+    Page[] pages()
+    {
+        if (cachedPages !is null)
+            return cachedPages;
+        cachedPages = fetchPages();
+        return cachedPages;
     }
 
     void clearArticle()
@@ -201,13 +190,6 @@ public:
             infobox = null;
         }
 
-        if (navBar !is null)
-        {
-            content.remove(navBar);
-            navBar = null;
-        }
-
-        // Remove any expanders
         Widget child = content.getFirstChild();
         while (child !is null)
         {
@@ -216,87 +198,353 @@ public:
             child = next;
         }
 
-        fetchedReports = null;
-        currentCompound = null;
+        compound = null;
+        cachedPages = null;
+        synthesisBody = null;
         moleculeView.setCompound(null);
     }
 
 private:
-    void onReportsExpand()
+    static bool isExcludedHeading(string heading)
     {
-        Thread reportThread = new Thread(&fetchReports);
-        reportThread.start();
+        immutable string[] excluded = [
+            "references", "external links", "further reading",
+            "see also", "notes", "bibliography", "sources",
+            "footnotes", "gallery", "navigation",
+        ];
+        string lower = heading.toLower;
+        foreach (ex; excluded)
+            if (lower == ex) return true;
+        return false;
     }
 
-    void fetchReports()
+    Page[] fetchPages()
     {
-        Label loadingLabel = new Label("Loading reports...");
-        loadingLabel.addCssClass("expander-detail");
-        loadingLabel.halign = Align.Start;
-        reportsExpander.addContent(loadingLabel);
+        import wikia.wikipedia : getPages;
 
-        try
-        {
-            Page[] pages = getPagesByTitle!"psychonaut"(currentCompound.name);
-            Page[] reports;
-            if (pages.length > 0)
-                reports = getReports(pages[0]);
+        auto cfg = config();
+        Page[] result;
 
-            populateReports(reports);
-        }
-        catch (Exception e)
+        if (cfg.enabledSources.canFind("wikipedia"))
         {
-            writeln("[ArticleView] Reports fetch failed: ", e.msg);
-            populateReports(null);
+            Page[] wikiPages = getPages!"wikipedia"(compound.name, 1);
+            if (wikiPages.length > 0)
+                result ~= wikiPages[0];
         }
 
-        reportsExpander.content.remove(loadingLabel);
+        if (cfg.enabledSources.canFind("psychonaut"))
+        {
+            Page psPage = resolvePage(compound);
+            if (psPage !is null)
+                result ~= psPage;
+        }
+
+        return result;
     }
 
-    void populateReports(Page[] reports)
+    Label makeTextLabel(string text, bool markup = false)
     {
-        if (reports is null || reports.length == 0)
+        Label lbl = new Label(text);
+        lbl.addCssClass("report-body-text");
+        lbl.halign = Align.Start;
+        lbl.xalign = 0;
+        lbl.wrap = true;
+        lbl.hexpand = true;
+        lbl.selectable = true;
+        if (markup)
         {
-            Label noResults = new Label("No reports found.");
-            noResults.addCssClass("expander-detail");
-            noResults.halign = Align.Start;
-            reportsExpander.addContent(noResults);
+            lbl.useMarkup = true;
+            lbl.connectActivateLink(&onLinkActivated);
+        }
+        return lbl;
+    }
+
+    void populateSectionContent(Expander exp, string rawContent)
+    {
+        // Simple manual scan for ===...=== markers
+        struct SubSec { size_t start; size_t end; string heading; }
+        SubSec[] subs;
+
+        size_t i = 0;
+        while (i + 3 < rawContent.length)
+        {
+            if (rawContent[i .. i + 3] == "===")
+            {
+                size_t hStart = i + 3;
+                auto closeIdx = rawContent[hStart .. $].indexOf("===");
+                if (closeIdx >= 0)
+                {
+                    string heading = rawContent[hStart .. hStart + closeIdx].strip;
+                    if (heading.length > 0)
+                    {
+                        subs ~= SubSec(i, hStart + closeIdx + 3, heading);
+                        i = hStart + closeIdx + 3;
+                        continue;
+                    }
+                }
+            }
+            i++;
+        }
+
+        if (subs.length == 0)
+        {
+            string cleaned = cleanWikitext(rawContent);
+            if (cleaned.length > 0)
+            {
+                Label lbl = makeTextLabel(linkifyUrls(cleaned), true);
+                exp.addContent(lbl);
+                resolveCompoundLinks(lbl, cleaned);
+            }
+            else
+            {
+                Label empty = new Label("No content.");
+                empty.addCssClass("expander-detail");
+                empty.halign = Align.Start;
+                exp.addContent(empty);
+            }
             return;
         }
 
-        fetchedReports = reports;
-
-        foreach (report; reports)
+        size_t lastEnd = 0;
+        foreach (ref sub; subs)
         {
-            Box reportRow = new Box(Orientation.Horizontal, 0);
-            reportRow.addCssClass("report-row");
-            reportRow.hexpand = true;
+            string before = rawContent[lastEnd .. sub.start];
+            string cleanedBefore = cleanWikitext(before);
+            if (cleanedBefore.length > 0)
+            {
+                Label lbl = makeTextLabel(linkifyUrls(cleanedBefore), true);
+                exp.addContent(lbl);
+                resolveCompoundLinks(lbl, cleanedBefore);
+            }
 
-            Label titleLabel = new Label(report.title);
-            titleLabel.addCssClass("report-title");
-            titleLabel.tooltipText = report.url;
-            titleLabel.halign = Align.Start;
-            titleLabel.xalign = 0;
-            titleLabel.hexpand = true;
-            titleLabel.wrap = true;
-            reportRow.append(titleLabel);
+            Label subHead = new Label(sub.heading);
+            subHead.addCssClass("article-subheading");
+            subHead.halign = Align.Start;
+            subHead.xalign = 0;
+            exp.addContent(subHead);
 
-            GestureClick rowClick = new GestureClick();
-            // Stupid bullshit closure bug so we wrap the delegate in a lambda and call that with the instance variable.
-            // It's super confusing but actually it makes sense because we're making a new scope with the lambda.
-            rowClick.connectReleased(((r) => (int n, double x, double y) {
-                fromReport(r);
-            })(report));
-            reportRow.addController(rowClick);
+            lastEnd = sub.end;
+        }
 
-            reportsExpander.addContent(reportRow);
+        if (lastEnd < rawContent.length)
+        {
+            string tail = cleanWikitext(rawContent[lastEnd .. $]);
+            if (tail.length > 0)
+            {
+                Label lbl = makeTextLabel(linkifyUrls(tail), true);
+                exp.addContent(lbl);
+                resolveCompoundLinks(lbl, tail);
+            }
+        }
+    }
+
+    void renderDirect(Page[] pages)
+    {
+        if (synthesisBody is null) return;
+        clearSynthesisLoading();
+
+        bool hadIntro;
+
+        foreach (page; pages)
+        {
+            string raw = page.raw;
+            if (raw is null || raw.length == 0) continue;
+
+            string preamble = cleanWikitext(page.preamble);
+            if (preamble.length > 0)
+            {
+                hadIntro = true;
+                Label lbl = makeTextLabel(linkifyUrls(preamble), true);
+                synthesisBody.append(lbl);
+                resolveCompoundLinks(lbl, preamble);
+            }
+
+            Section[] sections = page.sections;
+            Expander currentExp;
+            string currentContent;
+
+            void flushExpander()
+            {
+                if (currentExp !is null)
+                {
+                    populateSectionContent(currentExp, currentContent);
+                    synthesisBody.append(currentExp);
+                    currentExp = null;
+                    currentContent = null;
+                }
+            }
+
+            foreach (sec; sections)
+            {
+                if (isExcludedHeading(sec.heading))
+                    continue;
+
+                if (sec.level <= 2)
+                {
+                    flushExpander();
+                    currentExp = new Expander(sec.heading);
+                    currentContent = sec.content;
+                }
+                else
+                {
+                    if (currentExp !is null)
+                        currentContent ~= "\n\n===" ~ sec.heading ~ "===\n" ~ sec.content;
+                    else
+                    {
+                        currentExp = new Expander(sec.heading);
+                        currentContent = sec.content;
+                    }
+                }
+            }
+            flushExpander();
+        }
+
+        if (!hadIntro && compound !is null)
+        {
+            string desc = compound.description;
+            if (desc.length > 0)
+            {
+                Label lbl = makeTextLabel(linkifyUrls(desc), true);
+                synthesisBody.prepend(lbl);
+                resolveCompoundLinks(lbl, desc);
+            }
+        }
+        writeln("[ArticleView] Direct render complete");
+    }
+
+    void clearSynthesisLoading()
+    {
+        if (synthesisBody is null) return;
+        Widget first = synthesisBody.getFirstChild();
+        if (first !is null)
+            synthesisBody.remove(first);
+    }
+
+    void fetchAndSynthesize()
+    {
+        try
+        {
+            if (compound is null) return;
+
+            auto cfg = config();
+            writeln("[ArticleView] Starting synthesis for: ", compound.name,
+                " sources=", cfg.enabledSources);
+
+            Page[] allPages = pages();
+            writeln("[ArticleView] Fetched ", allPages.length, " pages");
+
+            if (allPages.length == 0)
+            {
+                if (synthesisBody !is null)
+                {
+                    clearSynthesisLoading();
+                    synthesisBody.append(makeTextLabel("No source pages found."));
+                }
+                return;
+            }
+
+            if (cfg.enabledSources.length <= 1)
+            {
+                renderDirect(allPages);
+                return;
+            }
+
+            Expander[] sectionExpanders;
+            size_t[size_t] groupToExpander;
+            Box introPlaceholder;
+            size_t introGroupIdx = size_t.max;
+
+            ease(compound.name,
+                (string[] headings) {
+                    if (synthesisBody is null) return;
+                    clearSynthesisLoading();
+
+                    bool hasIntro;
+                    foreach (h; headings)
+                    {
+                        if (h.toLower == "introduction")
+                        {
+                            hasIntro = true;
+                            break;
+                        }
+                    }
+
+                    if (!hasIntro && compound !is null)
+                    {
+                        string desc = compound.description;
+                        if (desc.length > 0)
+                        {
+                            Label lbl = makeTextLabel(linkifyUrls(desc), true);
+                            synthesisBody.prepend(lbl);
+                            resolveCompoundLinks(lbl, desc);
+                        }
+                    }
+
+                    foreach (i, heading; headings)
+                    {
+                        if (heading.toLower == "introduction")
+                        {
+                            introGroupIdx = i;
+                            introPlaceholder = makeLoadingDots();
+                            introPlaceholder.marginStart = 16;
+                            introPlaceholder.marginTop = 8;
+                            introPlaceholder.marginBottom = 8;
+                            synthesisBody.append(introPlaceholder);
+                        }
+                        else
+                        {
+                            Expander exp = new Expander("");
+                            exp.setLoading(true);
+                            synthesisBody.append(exp);
+                            groupToExpander[i] = sectionExpanders.length;
+                            sectionExpanders ~= exp;
+                        }
+                    }
+                },
+                (size_t idx, Section sec) {
+                    if (synthesisBody is null) return;
+
+                    if (idx == introGroupIdx)
+                    {
+                        if (introPlaceholder !is null)
+                        {
+                            synthesisBody.remove(introPlaceholder);
+                            introPlaceholder = null;
+                        }
+                        string cleaned = cleanWikitext(sec.content);
+                        if (cleaned.length > 0)
+                        {
+                            Label lbl = makeTextLabel(linkifyUrls(cleaned), true);
+                            synthesisBody.prepend(lbl);
+                            resolveCompoundLinks(lbl, cleaned);
+                        }
+                        return;
+                    }
+
+                    size_t* pExpIdx = idx in groupToExpander;
+                    if (pExpIdx is null) return;
+
+                    Expander exp = sectionExpanders[*pExpIdx];
+                    exp.setTitle(sec.heading);
+                    populateSectionContent(exp, sec.content);
+                },
+                { writeln("[ArticleView] Synthesis complete"); },
+                allPages);
+        }
+        catch (Exception e)
+        {
+            writeln("[ArticleView] Synthesis failed: ", e.msg);
+            if (synthesisBody !is null)
+            {
+                clearSynthesisLoading();
+                synthesisBody.append(makeTextLabel("Article synthesis failed."));
+            }
         }
     }
 
     void fromReport(Page report)
     {
         inReportView = true;
-        activeReport = report;
 
         // Swap scroller child to report view
         scroller.setChild(null);
@@ -307,7 +555,7 @@ private:
         reportView.vexpand = true;
 
         // Report nav bar
-        auto rNavBar = new Box(Orientation.Horizontal, 0);
+        Box rNavBar = new Box(Orientation.Horizontal, 0);
         rNavBar.addCssClass("article-nav");
         rNavBar.hexpand = true;
         rNavBar.halign = Align.Fill;
@@ -346,11 +594,11 @@ private:
         reportView.append(rNavBar);
 
         // Report body container
-        auto reportBody = new Box(Orientation.Vertical, 0);
+        Box reportBody = new Box(Orientation.Vertical, 0);
         reportBody.addCssClass("report-body");
         reportBody.hexpand = true;
 
-        auto loadingLabel = new Label("Loading report...");
+        Label loadingLabel = new Label("Loading report...");
         loadingLabel.addCssClass("report-body-text");
         loadingLabel.halign = Align.Start;
         reportBody.append(loadingLabel);
@@ -363,11 +611,10 @@ private:
             try
             {
                 string raw = report.raw;
-                if (raw is null || raw.length == 0)
+                if (raw.length == 0)
                 {
                     reportBody.remove(loadingLabel);
-                    writeln(report.url);
-                    auto noContent = new Label("No content available.");
+                    Label noContent = new Label("No content available.");
                     noContent.addCssClass("report-body-text");
                     noContent.halign = Align.Start;
                     reportBody.append(noContent);
@@ -380,7 +627,7 @@ private:
                 string preamble = report.preamble;
                 if (preamble.length > 0)
                 {
-                    auto preLabel = new Label(preamble);
+                    Label preLabel = new Label(preamble);
                     preLabel.addCssClass("report-body-text");
                     preLabel.halign = Align.Start;
                     preLabel.xalign = 0;
@@ -394,7 +641,7 @@ private:
                 Section[] secs = report.sections;
                 foreach (sec; secs)
                 {
-                    auto secHeading = new Label(sec.heading);
+                    Label secHeading = new Label(sec.heading);
                     secHeading.addCssClass("report-section-heading");
                     secHeading.halign = Align.Start;
                     secHeading.xalign = 0;
@@ -403,7 +650,7 @@ private:
                     string cleaned = cleanWikitext(sec.content);
                     if (cleaned.length > 0)
                     {
-                        auto secContent = new Label(cleaned);
+                        Label secContent = new Label(cleaned);
                         secContent.addCssClass("report-body-text");
                         secContent.halign = Align.Start;
                         secContent.xalign = 0;
@@ -417,7 +664,7 @@ private:
             catch (Exception e)
             {
                 reportBody.remove(loadingLabel);
-                auto errLabel = new Label("Failed to load report.");
+                Label errLabel = new Label("Failed to load report.");
                 errLabel.addCssClass("report-body-text");
                 errLabel.halign = Align.Start;
                 reportBody.append(errLabel);
@@ -429,36 +676,8 @@ private:
     void hideReport()
     {
         inReportView = false;
-        activeReport = null;
-
-        // Swap back to compound view
         scroller.setChild(root);
         reportView = null;
-    }
-
-    void addPropRow(Box parent, string label, string value)
-    {
-        Box row = new Box(Orientation.Horizontal, 8);
-        row.addCssClass("expander-row");
-        row.hexpand = true;
-        row.halign = Align.Fill;
-
-        Label lbl = new Label(label);
-        lbl.addCssClass("expander-row-label");
-        lbl.halign = Align.Start;
-        lbl.valign = Align.Start;
-
-        Label val = new Label(value);
-        val.addCssClass("expander-row-value");
-        val.halign = Align.End;
-        val.hexpand = true;
-        val.wrap = true;
-        val.maxWidthChars = 40;
-        val.selectable = true;
-
-        row.append(lbl);
-        row.append(val);
-        parent.append(row);
     }
 
     void buildOverlay()
@@ -491,6 +710,84 @@ private:
 
         if (infobox !is null)
             infobox.setupMView();
+    }
+
+    bool onLinkActivated(string uri)
+    {
+        import std.string : startsWith;
+        if (uri.startsWith("compound:"))
+        {
+            string name = uri[9 .. $];
+            writeln("[ArticleView] Compound link clicked: ", name);
+            if (onCompoundNavigate !is null)
+                onCompoundNavigate(name);
+            return true;
+        }
+        return false;
+    }
+
+    void resolveCompoundLinks(Label label, string plainText)
+    {
+        Thread resolveThread = new Thread({
+            try
+            {
+                string[] names = extractCompoundNames(plainText);
+                if (names.length == 0) return;
+
+                // Skip the current compound's own name
+                string currentName = compound !is null ? compound.name.toLower : "";
+                string markup = linkifyUrls(plainText);
+                foreach (name; names)
+                {
+                    if (name.toLower == currentName) continue;
+                    markup = linkifyCompoundName(markup, name);
+                }
+                label.label = markup;
+            }
+            catch (Exception e)
+                writeln("[ArticleView] Compound resolve failed: ", e.msg);
+        });
+        resolveThread.start();
+    }
+
+    static string linkifyCompoundName(string markup, string name)
+    {
+        import std.string : indexOf;
+        string escaped = name.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+        string linked = `<a href="compound:` ~ name ~ `">` ~ escaped ~ `</a>`;
+
+        // Replace first occurrence that isn't already inside a tag
+        auto idx = markup.indexOf(escaped);
+        if (idx >= 0)
+        {
+            // Check we're not inside an existing <a> tag
+            bool insideTag = false;
+            int openTags = 0;
+            foreach (i; 0 .. idx)
+            {
+                if (markup[i] == '<') openTags++;
+                if (markup[i] == '>') openTags--;
+            }
+            if (openTags <= 0)
+                markup = markup[0 .. idx] ~ linked ~ markup[idx + escaped.length .. $];
+        }
+        return markup;
+    }
+
+    static string linkifyUrls(string text)
+    {
+        // Escape Pango markup special chars
+        text = text.replace("&", "&amp;");
+        text = text.replace("<", "&lt;");
+        text = text.replace(">", "&gt;");
+
+        // Convert URLs to <a> tags
+        enum urlRe = ctRegex!(`https?://[^\s<>"]+`);
+        text = replaceAll!((m) =>
+            `<a href="` ~ m.hit ~ `">` ~ m.hit ~ `</a>`
+        )(text, urlRe);
+
+        return text;
     }
 
     void onViewerClicked()

@@ -136,6 +136,28 @@ string[][] internalGetSynonyms(string TYPE)(string str)
     return ret;
 }
 
+string[] internalGetDescription(string TYPE)(string str)
+{
+    string[] ret;
+    orchestrator.rateLimit();
+    orchestrator.client.get(
+        orchestrator.buildURL("/compound/"~TYPE~"/"~str~"/description/JSON"), 
+        (ubyte[] data) {
+            JSONValue json = parseJSON(data.assumeUTF);
+            if (json.isNull || "InformationList" !in json || "Information" !in json["InformationList"])
+                return;
+
+            foreach (info; json["InformationList"]["Information"].array)
+            {
+                if ("Description" in info)
+                    ret ~= info["Description"].str;
+            }
+        }, 
+        null
+    );
+    return ret;
+}
+
 Compound[] internalSimilaritySearch(string TYPE)(string str, int threshold = 90, int maxRecords = 2_000_000)
 {
     Compound[] ret;

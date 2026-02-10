@@ -38,6 +38,15 @@ public:
     string source;
     string url;
 
+    static Page fromRaw(string title, string source, string rawContent)
+    {
+        auto p = new Page();
+        p.title = title;
+        p.source = source;
+        p._raw = rawContent;
+        return p;
+    }
+
     ref string raw()
     {
         if (_raw is null && _fetchContent !is null)
@@ -125,20 +134,36 @@ string cleanWikitext(string text)
     if (text is null || text.length == 0)
         return "";
 
-    // Remove categories
-    enum catRe = ctRegex!(`\[\[Category:[^\]]*\]\]`);
-    foreach (m; matchAll(text, catRe))
-        text = text.replace(m.hit, "");
-
     // Remove HTML comments
     enum commentRe = ctRegex!(`<!--[\s\S]*?-->`);
     foreach (m; matchAll(text, commentRe))
         text = text.replace(m.hit, "");
 
-    // Remove ref tags
-    enum refRe = ctRegex!(`</?ref[^>]*>`);
+    // Remove <ref>...</ref> content tags (with content between them)
+    enum refContentRe = ctRegex!(`<ref[^>]*>[\s\S]*?</ref>`);
+    foreach (m; matchAll(text, refContentRe))
+        text = text.replace(m.hit, "");
+
+    // Remove self-closing and open/close ref tags
+    enum refRe = ctRegex!(`</?ref[^>]*/?>`);
     foreach (m; matchAll(text, refRe))
         text = text.replace(m.hit, "");
+
+    // Remove categories
+    enum catRe = ctRegex!(`\[\[Category:[^\]]*\]\]`);
+    foreach (m; matchAll(text, catRe))
+        text = text.replace(m.hit, "");
+
+    // Remove file/image links [[File:...]] [[Image:...]]
+    enum fileRe = ctRegex!(`\[\[(?:File|Image):[^\]]*\]\]`);
+    foreach (m; matchAll(text, fileRe))
+        text = text.replace(m.hit, "");
+
+    // Remove wikitables {| ... |}
+    text = stripNested(text, "{|", "|}");
+
+    // Remove templates {{ ... }} (nested)
+    text = stripNested(text, "{{", "}}");
 
     // Convert wiki links [[target|display]] -> display, [[target]] -> target
     enum linkRe = ctRegex!(`\[\[([^\]|]+)(?:\|([^\]]+))?\]\]`);
@@ -148,13 +173,67 @@ string cleanWikitext(string text)
         text = text.replace(m.hit, display);
     }
 
+    // Remove remaining HTML tags
+    enum htmlRe = ctRegex!(`<[^>]+>`);
+    foreach (m; matchAll(text, htmlRe))
+        text = text.replace(m.hit, "");
+
     // Remove bold/italic markup
     text = text.replace("'''''", "");
     text = text.replace("'''", "");
     text = text.replace("''", "");
 
-    // Convert &nbsp; to space
+    // Convert HTML entities
     text = text.replace("&nbsp;", " ");
+    text = text.replace("&ndash;", "–");
+    text = text.replace("&mdash;", "—");
+    text = text.replace("&amp;", "&");
+    text = text.replace("&lt;", "<");
+    text = text.replace("&gt;", ">");
+
+    // Convert bullet/numbered list markup to plain text
+    enum listRe = ctRegex!(`(?m)^\*+\s*`);
+    foreach (m; matchAll(text, listRe))
+        text = text.replace(m.hit, "• ");
+
+    enum numListRe = ctRegex!(`(?m)^#+\s*`);
+    foreach (m; matchAll(text, numListRe))
+        text = text.replace(m.hit, "");
+
+    // Collapse multiple blank lines
+    enum blankRe = ctRegex!(`\n{3,}`);
+    foreach (m; matchAll(text, blankRe))
+        text = text.replace(m.hit, "\n\n");
 
     return text.strip;
+}
+
+string stripNested(string text, string open, string close)
+{
+    string result;
+    int depth = 0;
+    size_t i = 0;
+
+    while (i < text.length)
+    {
+        if (i + open.length <= text.length && text[i .. i + open.length] == open)
+        {
+            depth++;
+            i += open.length;
+        }
+        else if (i + close.length <= text.length && text[i .. i + close.length] == close)
+        {
+            if (depth > 0)
+                depth--;
+            i += close.length;
+        }
+        else
+        {
+            if (depth == 0)
+                result ~= text[i];
+            i++;
+        }
+    }
+
+    return result;
 }

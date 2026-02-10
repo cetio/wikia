@@ -35,6 +35,17 @@ JSONValue query(string[string] params)
     return json;
 }
 
+bool isExactPage(string title, string[] syns)
+{
+    string lower = title.toLower;
+    foreach (syn; syns)
+    {
+        if (syn.toLower == lower)
+            return true;
+    }
+    return false;
+}
+
 package:
 
 void _psFetchContent(Page page)
@@ -55,6 +66,82 @@ void _psFetchContent(Page page)
 }
 
 public:
+
+Page resolvePage(Compound compound)
+{
+    import std.stdio : writeln;
+
+    Compound[] similar = similaritySearch(compound.cid, 90, 5);
+    int[] simCids;
+    foreach (sim; similar)
+        simCids ~= sim.cid;
+
+    if (simCids.length == 0)
+        return null;
+
+    Compound[] withProps = getProperties!"cid"(simCids);
+
+    double refXLogP = compound.properties.xlogp;
+    double refMW = compound.properties.weight;
+    Compound[] filtered;
+    foreach (sim; withProps)
+    {
+        if (sim.cid == compound.cid)
+        {
+            filtered ~= sim;
+            continue;
+        }
+
+        if (!isNaN(refXLogP) && !isNaN(sim.properties.xlogp))
+        {
+            if (abs(sim.properties.xlogp - refXLogP) > 0.5)
+                continue;
+        }
+        if (!isNaN(refMW) && refMW > 0 && !isNaN(sim.properties.weight) && sim.properties.weight > 0)
+        {
+            if (abs(sim.properties.weight - refMW) / refMW > 0.08)
+                continue;
+        }
+        filtered ~= sim;
+    }
+
+    if (filtered.length == 0)
+        return null;
+
+    string[] names;
+    foreach (sim; filtered)
+        names ~= sim.name;
+    Page[] simPages = getPagesByTitle!"psychonaut"(names);
+
+    int[] filteredCids;
+    foreach (sim; filtered)
+        filteredCids ~= sim.cid;
+    string[][] allSyns = getSynonyms!"cid"(filteredCids);
+
+    string[][int] synsByCid;
+    foreach (i, sim; filtered)
+    {
+        if (i < allSyns.length)
+            synsByCid[sim.cid] = allSyns[i];
+    }
+
+    foreach (sim; filtered)
+    {
+        string[] simSyns = sim.cid in synsByCid ? synsByCid[sim.cid] : [];
+        foreach (page; simPages)
+        {
+            if (isExactPage(page.title, simSyns))
+            {
+                writeln("[Psychonaut] Resolved page '", page.title,
+                    "' for compound ", compound.name);
+                return page;
+            }
+        }
+    }
+
+    writeln("[Psychonaut] No matching page for compound ", compound.name);
+    return null;
+}
 
 Page[] getPages(string DB)(string term, int limit = 10)
     if (DB == "psychonaut")
@@ -159,120 +246,29 @@ struct DosageResult
 
 DosageResult getDosage(Compound compound)
 {
-    Dosage[] tryParseDosage(string title)
-    {
-        JSONValue json = query([
-            "action": "parse", "prop": "wikitext",
-            "page": "Template:SubstanceBox/"~title
-        ]);
-        if ("parse" !in json || "wikitext" !in json["parse"])
-            return [];
-
-        JSONValue wikitext = json["parse"]["wikitext"];
-        string raw;
-        if (wikitext.type == JSONType.object && "*" in wikitext)
-            raw = wikitext["*"].str;
-        else if (wikitext.type == JSONType.string)
-            raw = wikitext.str;
-
-        if (raw is null)
-            return [];
-
-        return parseDosageText(raw);
-    }
-
-    bool isExactPage(string title, string[] syns)
-    {
-        string lower = title.toLower;
-        foreach (syn; syns)
-        {
-            if (syn.toLower == lower)
-                return true;
-        }
-        return false;
-    }
-
-    // 1. Fetch all similar compounds (CIDs only) - includes primary compound
-    Compound[] similar = similaritySearch(compound.cid, 90, 5);
-    int[] simCids;
-    foreach (sim; similar)
-        simCids ~= sim.cid;
-
-    if (simCids.length == 0)
+    Page page = resolvePage(compound);
+    if (page is null)
         return DosageResult([], null);
 
-    // 2. Batch get properties for all similar CIDs
-    Compound[] withProps = getProperties!"cid"(simCids);
-
-    // 3. Filter by XLogP difference > 0.5 or MW difference > 8%
-    // Always include the primary compound (diff = 0)
-    double refXLogP = compound.properties.xlogp;
-    double refMW = compound.properties.weight;
-    Compound[] filtered;
-    foreach (sim; withProps)
-    {
-        // Always include the primary compound
-        if (sim.cid == compound.cid)
-        {
-            filtered ~= sim;
-            continue;
-        }
-        
-        if (!isNaN(refXLogP) && !isNaN(sim.properties.xlogp))
-        {
-            if (abs(sim.properties.xlogp - refXLogP) > 0.5)
-                continue;
-        }
-        if (!isNaN(refMW) && refMW > 0 && !isNaN(sim.properties.weight) && sim.properties.weight > 0)
-        {
-            if (abs(sim.properties.weight - refMW) / refMW > 0.08)
-                continue;
-        }
-        filtered ~= sim;
-    }
-
-    if (filtered.length == 0)
+    JSONValue json = query([
+        "action": "parse", "prop": "wikitext",
+        "page": "Template:SubstanceBox/"~page.title
+    ]);
+    if ("parse" !in json || "wikitext" !in json["parse"])
         return DosageResult([], null);
 
-    // 4. Batch fetch psychonaut pages by compound names
-    string[] names;
-    foreach (sim; filtered)
-        names ~= sim.name;
-    Page[] simPages = getPagesByTitle!"psychonaut"(names);
+    JSONValue wikitext = json["parse"]["wikitext"];
+    string raw;
+    if (wikitext.type == JSONType.object && "*" in wikitext)
+        raw = wikitext["*"].str;
+    else if (wikitext.type == JSONType.string)
+        raw = wikitext.str;
 
-    // 5. Batch get synonyms for filtered CIDs
-    int[] filteredCids;
-    foreach (sim; filtered)
-        filteredCids ~= sim.cid;
-    string[][] allSyns = getSynonyms!"cid"(filteredCids);
+    if (raw is null)
+        return DosageResult([], null);
 
-    // Build CID -> synonyms map
-    string[][int] synsByCid;
-    foreach (i, sim; filtered)
-    {
-        if (i < allSyns.length)
-            synsByCid[sim.cid] = allSyns[i];
-    }
-
-    // 6. Match synonyms to pages and extract dosage
-    foreach (sim; filtered)
-    {
-        string[] simSyns = sim.cid in synsByCid ? synsByCid[sim.cid] : [];
-        foreach (page; simPages)
-        {
-            if (isExactPage(page.title, simSyns))
-            {
-                Dosage[] d = tryParseDosage(page.title);
-                if (d.length > 0)
-                {
-                    Compound source = (sim.cid == compound.cid) ? null : sim;
-                    return DosageResult(d, source);
-                }
-            }
-        }
-    }
-
-    return DosageResult([], null);
+    Dosage[] d = parseDosageText(raw);
+    return DosageResult(d, null);
 }
 
 Dosage[] parseDosageText(string raw)

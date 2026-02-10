@@ -53,6 +53,17 @@ string[] getSynonyms(string name)
     return internalGetSynonyms!"name"(name)[0];
 }
 
+string[] getDescription(string TYPE)(int[] ids...)
+    if (TYPE == "cid" || TYPE == "sid")
+{
+    return internalGetDescription!TYPE(ids.map!(x => x.to!string).array.join(","));
+}
+
+string[] getDescription(string name)
+{
+    return internalGetDescription!"name"(name);
+}
+
 Compound[] similaritySearch(int cid, int threshold = 90, int maxRecords = 10)
 {
     return internalSimilaritySearch!"cid"(cid.to!string, threshold, maxRecords);

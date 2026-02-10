@@ -3,10 +3,11 @@
 		"cet"
 	],
 	"copyright": "Copyright 2025, cet",
+	"dependencies": {
+		"gid:gtk4": "0.9.8",
+		"intuit": "~>0.3.0"
+	},
 	"description": ".",
 	"license": "AGPL-3.0-only",
-	"name": "wikia",
-	"dependencies": {
-		"gid:gtk4": "==0.9.8"
-	}
+	"name": "wikia"
 }

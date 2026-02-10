@@ -1,6 +1,8 @@
 {
 	"fileVersion": 1,
 	"versions": {
-		"gid": "0.9.8"
+		"gid": "0.9.8",
+		"intel-intrinsics": "1.13.0",
+		"intuit": "0.3.0"
 	}
 }

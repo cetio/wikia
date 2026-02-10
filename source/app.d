@@ -5,6 +5,7 @@ import std.file : exists, readText;
 import std.stdio : writeln;
 import std.algorithm;
 import std.array;
+import std.string : strip;
 import core.thread;
 
 import gio.types : ApplicationFlags;
@@ -71,6 +72,7 @@ public:
 
         article = new ArticleView();
         article.onGoHome = &showHome;
+        article.onCompoundNavigate = &onCompoundNavigate;
         stack.addNamed(article, "article");
 
         stack.visibleChildName = "homepage";
@@ -88,18 +90,22 @@ public:
 
     private void doSearch(string query)
     {
-        writeln("[App] doSearch called with query: ", query);
-        lastSearchCompound = getProperties(query);
+        string q = query.strip;
+        writeln("[App] doSearch called with query: ", q);
+        if (q.length < 2)
+            return;
+
+        lastSearchCompound = getProperties(q);
         
         if (lastSearchCompound is null)
         {
             writeln("[App] No compound found");
-            homepage.displayResults(query, lastSearchCompound);
+            homepage.displayResults(q, lastSearchCompound);
             return;
         }
         
         writeln("[App] Displaying primary dosage");
-        homepage.displayResults(query, lastSearchCompound, null);
+        homepage.displayResults(q, lastSearchCompound, null);
         
         // Spawn thread for similarity search
         Thread similarSearchThread = new Thread({
@@ -164,6 +170,30 @@ public:
     private void showArticle()
     {
         stack.visibleChildName = "article";
+    }
+
+    private void onCompoundNavigate(string compoundName)
+    {
+        writeln("[App] Navigating to compound: ", compoundName);
+        Thread navThread = new Thread({
+            try
+            {
+                Compound c = getProperties(compoundName);
+                if (c is null)
+                {
+                    writeln("[App] Compound not found: ", compoundName);
+                    return;
+                }
+                lastSearchCompound = c;
+                article.fromCompound(c);
+
+                DosageResult dosage = getDosage(c);
+                article.infobox.setDosage(dosage);
+            }
+            catch (Exception e)
+                writeln("[App] Compound navigate failed: ", e.msg);
+        });
+        navThread.start();
     }
 
     private void showHome()
