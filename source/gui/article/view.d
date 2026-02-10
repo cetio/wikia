@@ -97,7 +97,6 @@ private:
     Overlay screenOverlay;
 
     Expander reportsExpander;
-    Label loadingLabel;
     Compound currentCompound;
 
     // Report view state
@@ -231,7 +230,7 @@ private:
 
     void fetchReports()
     {
-        loadingLabel = new Label("Loading reports...");
+        Label loadingLabel = new Label("Loading reports...");
         loadingLabel.addCssClass("expander-detail");
         loadingLabel.halign = Align.Start;
         reportsExpander.addContent(loadingLabel);
@@ -269,12 +268,13 @@ private:
 
         foreach (report; reports)
         {
-            auto reportRow = new Box(Orientation.Horizontal, 0);
+            Box reportRow = new Box(Orientation.Horizontal, 0);
             reportRow.addCssClass("report-row");
             reportRow.hexpand = true;
 
-            auto titleLabel = new Label(report.title);
+            Label titleLabel = new Label(report.title);
             titleLabel.addCssClass("report-title");
+            titleLabel.tooltipText = report.url;
             titleLabel.halign = Align.Start;
             titleLabel.xalign = 0;
             titleLabel.hexpand = true;
@@ -282,9 +282,11 @@ private:
             reportRow.append(titleLabel);
 
             GestureClick rowClick = new GestureClick();
-            rowClick.connectReleased((int n, double x, double y) {
-                fromReport(report);
-            });
+            // Stupid bullshit closure bug so we wrap the delegate in a lambda and call that with the instance variable.
+            // It's super confusing but actually it makes sense because we're making a new scope with the lambda.
+            rowClick.connectReleased(((r) => (int n, double x, double y) {
+                fromReport(r);
+            })(report));
             reportRow.addController(rowClick);
 
             reportsExpander.addContent(reportRow);
@@ -364,7 +366,8 @@ private:
                 if (raw is null || raw.length == 0)
                 {
                     reportBody.remove(loadingLabel);
-                    auto noContent = new Label("(No root available)");
+                    writeln(report.url);
+                    auto noContent = new Label("No content available.");
                     noContent.addCssClass("report-body-text");
                     noContent.halign = Align.Start;
                     reportBody.append(noContent);

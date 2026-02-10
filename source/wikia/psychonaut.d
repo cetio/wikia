@@ -35,7 +35,9 @@ JSONValue query(string[string] params)
     return json;
 }
 
-void fetchContent(Page page)
+package:
+
+void _psFetchContent(Page page)
 {
     JSONValue json = query([
         "action": "parse", "prop": "wikitext",
@@ -73,7 +75,7 @@ Page[] getPages(string DB)(string term, int limit = 10)
         string title = res["title"].str;
         ret ~= new Page(title, "psychonaut",
             "https://psychonautwiki.org/wiki/"~title,
-            toDelegate(&fetchContent));
+            toDelegate(&_psFetchContent));
             
         if (ret.length >= limit)
             break;
@@ -105,7 +107,7 @@ Page[] getPagesByTitle(string DB)(string[] titles...)
         string title = page["title"].str;
         ret ~= new Page(title, "psychonaut",
             "https://psychonautwiki.org/wiki/"~title,
-            toDelegate(&fetchContent));
+            toDelegate(&_psFetchContent));
     }
     return ret;
 }
@@ -130,7 +132,7 @@ Page[] getReports(Page page, int limit = 20)
         string title = res["title"].str;
         ret ~= new Page(title, "psychonaut",
             "https://psychonautwiki.org/wiki/"~title,
-            toDelegate(&fetchContent));
+            toDelegate(&_psFetchContent));
 
         if (ret.length >= limit)
             break;

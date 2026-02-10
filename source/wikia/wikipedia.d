@@ -33,7 +33,9 @@ JSONValue query(string[string] params)
     return json;
 }
 
-void fetchContent(Page page)
+package:
+
+void _wiFetchContent(Page page)
 {
     JSONValue json = query([
         "action": "parse", "prop": "wikitext",
@@ -71,7 +73,7 @@ Page[] getPages(string DB)(string term, int limit = 10)
         string title = res["title"].str;
         ret ~= new Page(title, "wikipedia",
             "https://en.wikipedia.org/wiki/"~title,
-            toDelegate(&fetchContent));
+            toDelegate(&_wiFetchContent));
         if (ret.length >= limit)
             break;
     }
@@ -102,7 +104,7 @@ Page[] getPagesByTitle(string DB)(string[] titles...)
         string title = page["title"].str;
         ret ~= new Page(title, "wikipedia",
             "https://en.wikipedia.org/wiki/"~title,
-            toDelegate(&fetchContent));
+            toDelegate(&_wiFetchContent));
     }
     return ret;
 }

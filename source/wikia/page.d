@@ -20,19 +20,23 @@ package:
 
     this() { }
 
-public:
-    string title;
-    string source;
-    string url;
-
-    this(string title, string source, string url,
-        void delegate(Page) fetchContent)
+    this(
+        string title, 
+        string source, 
+        string url,
+        void delegate(Page) fetchContent
+    )
     {
         this.title = title;
         this.source = source;
         this.url = url;
         this._fetchContent = fetchContent;
     }
+
+public:
+    string title;
+    string source;
+    string url;
 
     ref string raw()
     {
