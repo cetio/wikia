@@ -1,1 +1,21 @@
-<svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><title>PsychonautWiki</title><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zm0 12.5c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+<svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><title>PsychonautWiki</title>
+  <!-- Upper eyelid -->
+  <path d="M1.5 12 C5 6, 19 6, 22.5 12" fill="none" stroke="currentColor" stroke-width="0.9" stroke-linecap="round"/>
+  <!-- Lower eyelid -->
+  <path d="M1.5 12 C5 18, 19 18, 22.5 12" fill="none" stroke="currentColor" stroke-width="0.9" stroke-linecap="round"/>
+  <!-- Upper eyelashes -->
+  <line x1="4" y1="8.2" x2="3" y2="5.8" stroke="currentColor" stroke-width="0.6" stroke-linecap="round"/>
+  <line x1="7" y1="7" x2="6.2" y2="4.4" stroke="currentColor" stroke-width="0.6" stroke-linecap="round"/>
+  <line x1="10" y1="6.4" x2="9.6" y2="3.7" stroke="currentColor" stroke-width="0.6" stroke-linecap="round"/>
+  <line x1="13" y1="6.2" x2="13" y2="3.5" stroke="currentColor" stroke-width="0.6" stroke-linecap="round"/>
+  <line x1="16" y1="6.5" x2="16.6" y2="3.9" stroke="currentColor" stroke-width="0.6" stroke-linecap="round"/>
+  <line x1="19" y1="7.5" x2="20" y2="5.2" stroke="currentColor" stroke-width="0.6" stroke-linecap="round"/>
+  <!-- Lower eyelashes -->
+  <line x1="5" y1="16" x2="4" y2="18" stroke="currentColor" stroke-width="0.5" stroke-linecap="round"/>
+  <line x1="8.5" y1="17" x2="8" y2="19" stroke="currentColor" stroke-width="0.5" stroke-linecap="round"/>
+  <line x1="12" y1="17.5" x2="12" y2="19.5" stroke="currentColor" stroke-width="0.5" stroke-linecap="round"/>
+  <!-- Iris (shifted right - looking right) -->
+  <circle cx="14" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="0.8"/>
+  <!-- Pupil (shifted right) -->
+  <circle cx="14.8" cy="12" r="1.4" fill="currentColor"/>
+</svg>

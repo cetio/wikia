@@ -3,6 +3,7 @@ module gui.article.infobox;
 import std.conv : to;
 import std.math : isNaN;
 import std.stdio : writeln;
+import std.uni : toUpper;
 
 import gtk.box;
 import gtk.event_controller_motion;
@@ -97,7 +98,7 @@ public:
         secHeader.addCssClass("infobox-section-header");
         secHeader.halign = Align.Fill;
 
-        Label headerLabel = new Label("Dosage");
+        Label headerLabel = new Label("DOSAGE");
         headerLabel.halign = Align.Start;
         headerLabel.hexpand = true;
         headerLabel.xalign = 0;
@@ -135,7 +136,7 @@ public:
 private:
     void buildChemicalSection(Box sec)
     {
-        Label secHeader = new Label("Chemical");
+        Label secHeader = new Label("CHEMICAL");
         secHeader.addCssClass("infobox-section-header");
         secHeader.halign = Align.Fill;
         secHeader.xalign = 0;
@@ -177,25 +178,35 @@ private:
         if (value is null || value.length == 0)
             return;
 
-        Box rowBox = new Box(Orientation.Horizontal, 8);
+        Box rowBox = new Box(Orientation.Horizontal, 0);
         rowBox.addCssClass("infobox-row");
         rowBox.hexpand = true;
         rowBox.halign = Align.Fill;
+        rowBox.homogeneous = true;
 
+        Box leftBox = new Box(Orientation.Horizontal, 0);
+        leftBox.hexpand = true;
+        leftBox.halign = Align.Fill;
         Label labelWidget = new Label(label);
         labelWidget.addCssClass("infobox-label");
-        labelWidget.halign = Align.Start;
+        labelWidget.halign = Align.End;
         labelWidget.valign = Align.Start;
+        leftBox.append(labelWidget);
 
+        Box rightBox = new Box(Orientation.Horizontal, 0);
+        rightBox.hexpand = true;
+        rightBox.halign = Align.Fill;
+        rightBox.marginStart = 8;
         Label valueWidget = new Label(value);
         valueWidget.addCssClass("infobox-value");
-        valueWidget.halign = Align.End;
-        valueWidget.hexpand = true;
+        valueWidget.halign = Align.Start;
+        valueWidget.valign = Align.Start;
         valueWidget.wrap = true;
-        valueWidget.maxWidthChars = 8;
+        valueWidget.maxWidthChars = 12;
+        rightBox.append(valueWidget);
 
-        rowBox.append(labelWidget);
-        rowBox.append(valueWidget);
+        rowBox.append(leftBox);
+        rowBox.append(rightBox);
         parent.append(rowBox);
     }
 
@@ -233,7 +244,7 @@ private:
 
     Label buildCollapsibleSubheading(string title, Box contentBox)
     {
-        Label header = new Label(title);
+        Label header = new Label(title.toUpper);
         header.addCssClass("dosage-route-header");
         header.halign = Align.Start;
         header.xalign = 0;

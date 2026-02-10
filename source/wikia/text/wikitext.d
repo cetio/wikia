@@ -313,9 +313,13 @@ private struct WikitextParser
             {
                 pos += 2;
                 lineEnd = findLineEnd(pos);
-                Node captionNode = Node(NodeType.TableCaption);
-                captionNode.text = src[pos .. lineEnd].strip;
-                nodes ~= captionNode;
+                const(char)[] capText = src[pos..lineEnd].strip;
+                uint capIdx = cast(uint) nodes.length;
+                nodes ~= Node(NodeType.TableCaption);
+                uint capChildStart = cast(uint) nodes.length;
+                parseInlineInto(capText);
+                nodes[capIdx].childStart = capChildStart;
+                nodes[capIdx].childEnd = cast(uint) nodes.length;
                 pos = lineEnd;
                 skipNewlines();
                 continue;

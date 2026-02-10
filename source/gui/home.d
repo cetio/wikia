@@ -47,8 +47,8 @@ private:
         title.hexpand = true;
         row.append(title);
 
-        Label cid = new Label("["~compound.cid.to!string~"]");
-        cid.addCssClass("search-result-detail");
+        Label cid = new Label(compound.cid.to!string);
+        cid.addCssClass("search-result-source");
         cid.halign = Align.End;
         row.append(cid);
 
@@ -149,7 +149,7 @@ public:
         searchBox.append(searchEntry);
 
         Button searchBtn = new Button();
-        searchBtn.label = "Search";
+        searchBtn.iconName = "system-search-symbolic";
         searchBtn.addCssClass("homepage-search-button");
         searchBtn.connectClicked(&submitSearch);
         searchBox.append(searchBtn);

@@ -109,6 +109,7 @@ public:
         backBtn.iconName = "go-previous-symbolic";
         backBtn.tooltipText = "Back";
         backBtn.addCssClass("nav-home-button");
+        backBtn.addCssClass("nav-back-button");
         backBtn.connectClicked(&onBackClicked);
         backBtn.halign = Align.Start;
         backBtn.valign = Align.Center;
@@ -304,7 +305,8 @@ private:
                 // Subsection: render heading + recurse into children.
                 if (doc.nodes[ci].text.length > 0)
                 {
-                    Label subHead = new Label(cast(string) doc.nodes[ci].text);
+                    import std.uni : toUpper;
+                    Label subHead = new Label((cast(string) doc.nodes[ci].text).toUpper);
                     subHead.addCssClass("article-subheading");
                     subHead.halign = Align.Start;
                     subHead.xalign = 0;
@@ -522,6 +524,7 @@ private:
         backBtn.iconName = "go-previous-symbolic";
         backBtn.tooltipText = "Back to compound";
         backBtn.addCssClass("nav-home-button");
+        backBtn.addCssClass("nav-back-button");
         backBtn.connectClicked(&hideReport);
         backBtn.halign = Align.Start;
         backBtn.valign = Align.Center;
@@ -648,26 +651,25 @@ private:
 
     void resolveCompoundLinks(Label label, string plainText)
     {
-        Thread resolveThread = new Thread({
-            try
-            {
-                string[] names = extractCompoundNames(plainText);
-                if (names.length == 0) return;
+        try
+        {
+            string[] names = extractCompoundNames(plainText);
+            if (names.length == 0) return;
 
-                // Skip the current compound's own name
-                string currentName = compound !is null ? compound.name.toLower : "";
-                string markup = linkifyUrls(plainText);
-                foreach (name; names)
-                {
-                    if (name.toLower == currentName) continue;
-                    markup = linkifyCompoundName(markup, name);
-                }
-                label.label = markup;
+            writeln("[ArticleView] Resolved ", names.length, " compound names");
+
+            // Skip the current compound's own name
+            string currentName = compound !is null ? compound.name.toLower : "";
+            string markup = linkifyUrls(plainText);
+            foreach (name; names)
+            {
+                if (name.toLower == currentName) continue;
+                markup = linkifyCompoundName(markup, name);
             }
-            catch (Exception e)
-                writeln("[ArticleView] Compound resolve failed: ", e.msg);
-        });
-        resolveThread.start();
+            label.label = markup;
+        }
+        catch (Exception e)
+            writeln("[ArticleView] Compound resolve failed: ", e.msg);
     }
 
     static string linkifyCompoundName(string markup, string name)

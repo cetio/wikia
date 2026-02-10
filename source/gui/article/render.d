@@ -1,13 +1,15 @@
 module gui.article.render;
 
+import std.uni : toUpper;
+
 import gtk.box;
-import gtk.grid;
 import gtk.label;
 import gtk.types : Orientation, Align;
 import gtk.widget : Widget;
 
 import wikia.text.ast;
 import wikia.page : Page;
+import gui.article.table : Table;
 
 /// Render a Page's AST into GTK widgets appended to `container`.
 /// Skips References, Comments, Categories, Templates, Images.
@@ -64,7 +66,7 @@ void renderSection(
             headingCallback(heading, section.level);
         else
         {
-            auto label = new Label(heading);
+            auto label = new Label(heading.toUpper);
             label.addCssClass(section.level <= 2 ? "article-heading" : "article-subheading");
             label.halign = Align.Start;
             label.xalign = 0;
@@ -128,6 +130,8 @@ string nodeToMarkup(ref Document doc, ref const Node node)
             return htmlTagToMarkup(cast(string) node.text);
 
         case Template:
+            return templateToMarkup(cast(string) node.text);
+
         case Reference:
         case Comment:
         case Category:
@@ -261,6 +265,42 @@ void renderNode(ref Document doc, ref const Node node, Box container)
     }
 }
 
+/// Extract Pango markup from all children of a node.
+string childrenMarkup(ref Document doc, ref const Node parent)
+{
+    if (!parent.hasChildren)
+    {
+        if (parent.text.length > 0)
+            return escapeMarkup(cast(string) parent.text);
+        return "";
+    }
+
+    string ret;
+    uint childIdx = parent.childStart;
+    while (childIdx < parent.childEnd)
+    {
+        ret ~= nodeToMarkup(doc, doc.nodes[childIdx]);
+        childIdx = doc.nextSiblingIdx(childIdx);
+    }
+    return ret;
+}
+
+Label makeLabel(string text, bool markup)
+{
+    if (markup)
+        text = sanitizePangoMarkup(text);
+    Label lbl = new Label(text);
+    lbl.addCssClass("report-body-text");
+    lbl.halign = Align.Start;
+    lbl.xalign = 0;
+    lbl.wrap = true;
+    lbl.hexpand = true;
+    lbl.selectable = true;
+    if (markup)
+        lbl.useMarkup = true;
+    return lbl;
+}
+
 private:
 
 void renderList(ref Document doc, ref const Node list, Box container)
@@ -268,7 +308,7 @@ void renderList(ref Document doc, ref const Node list, Box container)
     if (!list.hasChildren)
         return;
 
-    auto listBox = new Box(Orientation.Vertical, 2);
+    Box listBox = new Box(Orientation.Vertical, 2);
     listBox.addCssClass("article-list");
     listBox.hexpand = true;
     listBox.marginStart = 16;
@@ -292,7 +332,7 @@ void renderList(ref Document doc, ref const Node list, Box container)
                     counter++;
                 }
 
-                Label label = makeLabel(bullet ~ content, true);
+                Label label = makeLabel(bullet~content, true);
                 label.marginStart = cast(int)(
                     doc.nodes[itemIdx].level > 1
                         ? (doc.nodes[itemIdx].level - 1) * 12 : 0);
@@ -310,7 +350,7 @@ void renderDefinitionList(ref Document doc, ref const Node defList, Box containe
     if (!defList.hasChildren)
         return;
 
-    auto defBox = new Box(Orientation.Vertical, 2);
+    Box defBox = new Box(Orientation.Vertical, 2);
     defBox.addCssClass("article-list");
     defBox.hexpand = true;
     defBox.marginStart = 16;
@@ -337,154 +377,144 @@ void renderDefinitionList(ref Document doc, ref const Node defList, Box containe
 
 void renderTable(ref Document doc, ref const Node table, Box container)
 {
+    import std.string : toLower, strip;
+    import std.stdio : writeln, writef;
+    import std.conv : to;
+
     if (!table.hasChildren)
         return;
 
-    auto tableBox = new Box(Orientation.Vertical, 0);
-    tableBox.addCssClass("article-table");
-    tableBox.hexpand = true;
+    writeln("[Table] Rendering table with ", table.childEnd - table.childStart, " direct children");
 
-    // Count columns across all rows to size the grid correctly.
-    int maxColumns = 0;
-    uint scanIdx = table.childStart;
-    while (scanIdx < table.childEnd)
+    // First pass: collect rows as markup strings, track headers.
+    string[][] rowData;
+    bool[] rowIsHeader;
+    string caption;
+
+    uint ti = table.childStart;
+    while (ti < table.childEnd)
     {
-        if (doc.nodes[scanIdx].type == NodeType.TableRow && doc.nodes[scanIdx].hasChildren)
+        if (doc.nodes[ti].type == NodeType.TableCaption)
         {
-            int cols = 0;
-            uint cellIdx = doc.nodes[scanIdx].childStart;
-            while (cellIdx < doc.nodes[scanIdx].childEnd)
-            {
-                if (doc.nodes[cellIdx].type == NodeType.TableCell
-                    || doc.nodes[cellIdx].type == NodeType.TableHeader)
-                    cols++;
-                cellIdx = doc.nextSiblingIdx(cellIdx);
-            }
-            if (cols > maxColumns)
-                maxColumns = cols;
+            caption = childrenMarkup(doc, doc.nodes[ti]);
+            if (caption.length == 0)
+                caption = cast(string) doc.nodes[ti].text;
+            ti = doc.nextSiblingIdx(ti);
+            continue;
         }
-        scanIdx = doc.nextSiblingIdx(scanIdx);
+
+        if (doc.nodes[ti].type != NodeType.TableRow
+            || !doc.nodes[ti].hasChildren)
+        {
+            ti = doc.nextSiblingIdx(ti);
+            continue;
+        }
+
+        string[] cells;
+        bool hdr = true;
+
+        uint ci = doc.nodes[ti].childStart;
+        while (ci < doc.nodes[ti].childEnd)
+        {
+            if (doc.nodes[ci].type == NodeType.TableCell
+                || doc.nodes[ci].type == NodeType.TableHeader)
+            {
+                cells ~= childrenMarkup(doc, doc.nodes[ci]);
+                if (doc.nodes[ci].type != NodeType.TableHeader)
+                    hdr = false;
+            }
+            ci = doc.nextSiblingIdx(ci);
+        }
+
+        if (cells.length > 0)
+        {
+            writeln("[Table] Row ", rowData.length, " (hdr=", hdr, "): ", cells.length, " cells");
+            foreach (j, c; cells)
+                writeln("[Table]   cell[", j, "] len=", c.length, " '", c.length > 60 ? c[0..60]~"..." : c, "'");
+            rowData ~= cells;
+            rowIsHeader ~= hdr;
+        }
+        ti = doc.nextSiblingIdx(ti);
     }
 
-    if (maxColumns == 0)
+    if (rowData.length == 0)
         return;
 
-    // Skip tables where all cells are empty (e.g. reference-only tables).
-    bool hasContent = false;
-    scanIdx = table.childStart;
-    while (scanIdx < table.childEnd && !hasContent)
+    // Detect columns to drop: reference headers, entirely empty.
+    int maxCols;
+    foreach (row; rowData)
+        if (cast(int) row.length > maxCols)
+            maxCols = cast(int) row.length;
+
+    bool[] dropCol = new bool[maxCols];
+
+    // Mark ref-like header columns.
+    enum string[5] refNames = ["ref", "refs", "references", "ref.", "notes"];
+    foreach (ri, row; rowData)
     {
-        if (doc.nodes[scanIdx].type == NodeType.TableRow && doc.nodes[scanIdx].hasChildren)
+        if (!rowIsHeader[ri]) continue;
+        foreach (ci, cell; row)
         {
-            uint cellIdx = doc.nodes[scanIdx].childStart;
-            while (cellIdx < doc.nodes[scanIdx].childEnd)
+            string lower = cell.strip.toLower;
+            foreach (rn; refNames)
+                if (lower == rn) { dropCol[ci] = true; break; }
+        }
+    }
+
+    // Drop columns that are entirely empty across all rows.
+    foreach (ci; 0..maxCols)
+    {
+        if (dropCol[ci]) continue;
+        bool allEmpty = true;
+        foreach (row; rowData)
+        {
+            if (ci < row.length && row[ci].strip.length > 0)
             {
-                if ((doc.nodes[cellIdx].type == NodeType.TableCell
-                    || doc.nodes[cellIdx].type == NodeType.TableHeader)
-                    && childrenMarkup(doc, doc.nodes[cellIdx]).length > 0)
-                {
-                    hasContent = true;
-                    break;
-                }
-                cellIdx = doc.nextSiblingIdx(cellIdx);
+                allEmpty = false;
+                break;
             }
         }
-        scanIdx = doc.nextSiblingIdx(scanIdx);
+        if (allEmpty)
+            dropCol[ci] = true;
+    }
+
+    // Check if any visible content remains.
+    bool hasContent;
+    foreach (row; rowData)
+    {
+        foreach (ci, cell; row)
+        {
+            if (ci < dropCol.length && dropCol[ci]) continue;
+            if (cell.strip.length > 0) { hasContent = true; break; }
+        }
+        if (hasContent) break;
     }
     if (!hasContent)
         return;
 
-    auto grid = new Grid();
-    grid.addCssClass("article-table-grid");
-    grid.hexpand = true;
-    grid.columnHomogeneous = true;
-    grid.rowSpacing = 0;
-    grid.columnSpacing = 0;
+    Table tbl = new Table();
+    if (caption.length > 0)
+        tbl.setCaption(sanitizePangoMarkup(caption), true);
 
-    int row = 0;
-    uint tableChildIdx = table.childStart;
-    while (tableChildIdx < table.childEnd)
+    foreach (ri, row; rowData)
     {
-        if (doc.nodes[tableChildIdx].type == NodeType.TableCaption)
+        Widget[] filtered;
+        foreach (ci, cell; row)
         {
-            auto caption = new Label(cast(string) doc.nodes[tableChildIdx].text);
-            caption.addCssClass("article-table-caption");
-            caption.halign = Align.Start;
-            caption.xalign = 0;
-            caption.wrap = true;
-            tableBox.append(caption);
-            tableChildIdx = doc.nextSiblingIdx(tableChildIdx);
-            continue;
+            if (ci < dropCol.length && dropCol[ci])
+                continue;
+            Label lbl = makeLabel(cell, true);
+            lbl.wrap = false;
+            lbl.addCssClass("article-table-cell");
+            if (rowIsHeader[ri])
+                lbl.addCssClass("article-table-header");
+            filtered ~= lbl;
         }
-
-        if (doc.nodes[tableChildIdx].type != NodeType.TableRow
-            || !doc.nodes[tableChildIdx].hasChildren)
-        {
-            tableChildIdx = doc.nextSiblingIdx(tableChildIdx);
-            continue;
-        }
-
-        int col = 0;
-        uint cellIdx = doc.nodes[tableChildIdx].childStart;
-        while (cellIdx < doc.nodes[tableChildIdx].childEnd)
-        {
-            if (doc.nodes[cellIdx].type == NodeType.TableCell
-                || doc.nodes[cellIdx].type == NodeType.TableHeader)
-            {
-                string markup = childrenMarkup(doc, doc.nodes[cellIdx]);
-                Label cellLabel = makeLabel(markup, true);
-                cellLabel.addCssClass("article-table-cell");
-                if (doc.nodes[cellIdx].type == NodeType.TableHeader)
-                    cellLabel.addCssClass("article-table-header");
-                cellLabel.hexpand = true;
-                cellLabel.halign = Align.Fill;
-                cellLabel.valign = Align.Start;
-                grid.attach(cellLabel, col, row, 1, 1);
-                col++;
-            }
-            cellIdx = doc.nextSiblingIdx(cellIdx);
-        }
-        row++;
-        tableChildIdx = doc.nextSiblingIdx(tableChildIdx);
+        if (filtered.length > 0)
+            tbl.addRow(filtered, rowIsHeader[ri]);
     }
 
-    tableBox.append(grid);
-    container.append(tableBox);
-}
-
-string childrenMarkup(ref Document doc, ref const Node parent)
-{
-    if (!parent.hasChildren)
-    {
-        if (parent.text.length > 0)
-            return escapeMarkup(cast(string) parent.text);
-        return "";
-    }
-
-    string result;
-    uint childIdx = parent.childStart;
-    while (childIdx < parent.childEnd)
-    {
-        result ~= nodeToMarkup(doc, doc.nodes[childIdx]);
-        childIdx = doc.nextSiblingIdx(childIdx);
-    }
-    return result;
-}
-
-Label makeLabel(string text, bool markup)
-{
-    if (markup)
-        text = sanitizePangoMarkup(text);
-    auto label = new Label(text);
-    label.addCssClass("report-body-text");
-    label.halign = Align.Start;
-    label.xalign = 0;
-    label.wrap = true;
-    label.hexpand = true;
-    label.selectable = true;
-    if (markup)
-        label.useMarkup = true;
-    return label;
+    container.append(tbl);
 }
 
 /// Ensure all Pango-safe tags in the markup are properly balanced.
@@ -496,8 +526,8 @@ string sanitizePangoMarkup(string text)
 
     // Track open tag stack.
     string[] openStack;
-    string result;
-    result.reserve(text.length + 32);
+    string ret;
+    ret.reserve(text.length + 32);
 
     for (size_t idx = 0; idx < text.length; idx++)
     {
@@ -517,7 +547,7 @@ string sanitizePangoMarkup(string text)
 
             if (closeAngle < text.length && nameEnd > nameStart)
             {
-                string name = text[nameStart .. nameEnd];
+                string name = text[nameStart..nameEnd];
                 bool isPango = false;
                 foreach (tag; pangoTags)
                 {
@@ -541,8 +571,8 @@ string sanitizePangoMarkup(string text)
                                 // Close all tags down to the match.
                                 while (openStack.length >= s)
                                 {
-                                    result ~= "</" ~ openStack[$ - 1] ~ ">";
-                                    openStack = openStack[0 .. $ - 1];
+                                    ret ~= "</"~openStack[$ - 1]~">";
+                                    openStack = openStack[0..$ - 1];
                                 }
                                 found = true;
                                 break;
@@ -558,7 +588,7 @@ string sanitizePangoMarkup(string text)
                         bool selfClosing = closeAngle > 0 && text[closeAngle - 1] == '/';
                         if (!selfClosing)
                         {
-                            result ~= "<" ~ name ~ ">";
+                            ret ~= "<"~name~">";
                             openStack ~= name;
                         }
                         idx = closeAngle;
@@ -567,14 +597,14 @@ string sanitizePangoMarkup(string text)
                 }
             }
         }
-        result ~= text[idx];
+        ret ~= text[idx];
     }
 
     // Close any remaining unclosed tags.
     for (size_t s = openStack.length; s > 0; s--)
-        result ~= "</" ~ openStack[s - 1] ~ ">";
+        ret ~= "</"~openStack[s - 1]~">";
 
-    return result;
+    return ret;
 }
 
 /// Convert a recognized HTML tag to its Pango markup equivalent.
@@ -592,7 +622,7 @@ string htmlTagToMarkup(string tag)
     size_t nameEnd = nameStart;
     while (nameEnd < tag.length && tag[nameEnd] != '>' && tag[nameEnd] != ' ' && tag[nameEnd] != '/')
         nameEnd++;
-    string name = tag[nameStart .. nameEnd];
+    string name = tag[nameStart..nameEnd];
 
     // Pango supports <sub>, <sup>, <b>, <i>, <u>, <s>, <small>, <big>, <tt>.
     switch (name)
@@ -632,7 +662,7 @@ size_t matchPangoTag(string text, size_t idx)
         size_t nameEnd = nameStart + tag.length;
         if (nameEnd > text.length)
             continue;
-        if (text[nameStart .. nameEnd] != tag)
+        if (text[nameStart..nameEnd] != tag)
             continue;
         // Must be followed by '>' or ' ' or '/' for opening tags.
         if (nameEnd < text.length
@@ -658,7 +688,7 @@ string escapeMarkup(string text)
         return "";
 
     // Check if any escaping or entity decoding is needed.
-    bool needsWork = false;
+    bool needsWork;
     foreach (ch; text)
     {
         if (ch == '&' || ch == '<' || ch == '>')
@@ -670,30 +700,45 @@ string escapeMarkup(string text)
     if (!needsWork)
         return text;
 
-    string result;
-    result.reserve(text.length + 32);
+    string ret;
+    ret.reserve(text.length + 32);
     for (size_t idx = 0; idx < text.length; idx++)
     {
         if (text[idx] == '&')
         {
-            // Decode common HTML entities before escaping.
-            if (idx + 5 < text.length && text[idx .. idx + 6] == "&nbsp;")
+            // Preserve already-escaped XML entities, decode others.
+            if (idx + 3 < text.length && text[idx..idx + 4] == "&gt;")
             {
-                result ~= ' ';
+                ret ~= "&gt;";
+                idx += 3;
+            }
+            else if (idx + 3 < text.length && text[idx..idx + 4] == "&lt;")
+            {
+                ret ~= "&lt;";
+                idx += 3;
+            }
+            else if (idx + 4 < text.length && text[idx..idx + 5] == "&amp;")
+            {
+                ret ~= "&amp;";
+                idx += 4;
+            }
+            else if (idx + 5 < text.length && text[idx..idx + 6] == "&nbsp;")
+            {
+                ret ~= ' ';
                 idx += 5;
             }
-            else if (idx + 6 < text.length && text[idx .. idx + 7] == "&ndash;")
+            else if (idx + 6 < text.length && text[idx..idx + 7] == "&ndash;")
             {
-                result ~= '\u2013';
+                ret ~= '\u2013';
                 idx += 6;
             }
-            else if (idx + 6 < text.length && text[idx .. idx + 7] == "&mdash;")
+            else if (idx + 6 < text.length && text[idx..idx + 7] == "&mdash;")
             {
-                result ~= '\u2014';
+                ret ~= '\u2014';
                 idx += 6;
             }
             else
-                result ~= "&amp;";
+                ret ~= "&amp;";
         }
         else if (text[idx] == '<')
         {
@@ -708,17 +753,17 @@ string escapeMarkup(string text)
                 while (nameEnd < text.length && text[nameEnd] != '>'
                     && text[nameEnd] != ' ' && text[nameEnd] != '/')
                     nameEnd++;
-                string name = text[nameStart .. nameEnd];
-                result ~= closing ? ("</" ~ name ~ ">") : ("<" ~ name ~ ">");
+                string name = text[nameStart..nameEnd];
+                ret ~= closing ? ("</"~name~">") : ("<"~name~">");
                 idx += tagLen - 1;
             }
             else
-                result ~= "&lt;";
+                ret ~= "&lt;";
         }
         else if (text[idx] == '>')
-            result ~= "&gt;";
+            ret ~= "&gt;";
         else
-            result ~= text[idx];
+            ret ~= text[idx];
     }
-    return result;
+    return ret;
 }

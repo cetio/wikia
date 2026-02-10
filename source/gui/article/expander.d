@@ -1,5 +1,7 @@
 module gui.article.expander;
 
+import std.uni : toUpper;
+
 import gtk.box;
 import gtk.label;
 import gtk.gesture_click;
@@ -37,7 +39,7 @@ public:
         headerBox.halign = Align.Fill;
         headerBox.hexpand = true;
 
-        header = new Label("▸ "~title);
+        header = new Label("▸ "~title.toUpper);
         header.halign = Align.Start;
         header.xalign = 0;
         header.hexpand = true;
@@ -47,7 +49,7 @@ public:
         click.connectReleased((int nPress, double x, double y) {
             expanded = !expanded;
             content.visible = expanded;
-            header.label = (expanded ? "▾ " : "▸ ")~_title;
+            header.label = (expanded ? "▾ " : "▸ ")~_title.toUpper;
             if (expanded && !firstExpandFired)
             {
                 firstExpandFired = true;
@@ -84,7 +86,7 @@ public:
     void setTitle(string title)
     {
         _title = title;
-        header.label = (expanded ? "▾ " : "▸ ")~_title;
+        header.label = (expanded ? "▾ " : "▸ ")~_title.toUpper;
         if (_loading)
             setLoading(false);
     }

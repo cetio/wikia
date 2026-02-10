@@ -210,26 +210,30 @@ struct Document
         if (nodes.length <= 1)
             return;
 
-        Node[] result;
-        result.reserve(nodes.length);
-        result ~= Node(NodeType.Document); // root
+        Node[] ret;
+        ret.reserve(nodes.length);
+        ret ~= Node(NodeType.Document); // root
 
         // Recursively copy, skipping dropped types.
+        // Preserve all children inside table cells and headers.
         void copyChildren(uint start, uint end, uint parentIdx)
         {
-            uint newChildStart = cast(uint) result.length;
+            uint newChildStart = cast(uint) ret.length;
+            bool preserve = ret[parentIdx].type == NodeType.TableCell
+                         || ret[parentIdx].type == NodeType.TableHeader
+                         || ret[parentIdx].type == NodeType.TableCaption;
             uint i = start;
             while (i < end)
             {
-                if ((1u << nodes[i].type) & flags)
+                if (!preserve && (1u << nodes[i].type) & flags)
                 {
                     // Skip this node and its subtree.
                     i = nodes[i].hasChildren ? nodes[i].childEnd : i + 1;
                     continue;
                 }
 
-                uint newIdx = cast(uint) result.length;
-                result ~= nodes[i];
+                uint newIdx = cast(uint) ret.length;
+                ret ~= nodes[i];
 
                 if (nodes[i].hasChildren)
                 {
@@ -237,22 +241,21 @@ struct Document
                 }
                 else
                 {
-                    result[newIdx].childStart = 0;
-                    result[newIdx].childEnd = 0;
+                    ret[newIdx].childStart = 0;
+                    ret[newIdx].childEnd = 0;
                 }
 
                 i = nodes[i].hasChildren ? nodes[i].childEnd : i + 1;
             }
 
-            result[parentIdx].childStart = newChildStart;
-            result[parentIdx].childEnd = cast(uint) result.length;
+            ret[parentIdx].childStart = newChildStart;
+            ret[parentIdx].childEnd = cast(uint) ret.length;
         }
 
         copyChildren(nodes[0].childStart, nodes[0].childEnd, 0);
-        nodes = result;
+        nodes = ret;
     }
 
-    /// Helper: build a drop-flags bitmask from NodeType values.
     static uint dropFlag(NodeType[] types...)
     {
         uint flags = 0;
