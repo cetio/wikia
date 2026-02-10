@@ -1,5 +1,7 @@
 module gui.article.render;
 
+import std.conv : to;
+import std.string : toLower, strip, indexOf;
 import std.uni : toUpper;
 
 import gtk.box;
@@ -18,7 +20,7 @@ void renderPage(Page page, Box container)
     if (page is null)
         return;
 
-    auto doc = page.document();
+    Document doc = page.document();
     if (doc.nodes.length == 0)
         return;
 
@@ -37,7 +39,7 @@ void renderPreamble(Page page, Box container)
     if (page is null)
         return;
 
-    auto doc = page.document();
+    Document doc = page.document();
     if (doc.nodes.length == 0)
         return;
 
@@ -59,14 +61,14 @@ void renderSection(
         return;
 
     // Heading.
-    string heading = cast(string) section.text;
+    string heading = section.text;
     if (heading.length > 0)
     {
         if (headingCallback !is null)
             headingCallback(heading, section.level);
         else
         {
-            auto label = new Label(heading.toUpper);
+            Label label = new Label(heading.toUpper);
             label.addCssClass(section.level <= 2 ? "article-heading" : "article-subheading");
             label.halign = Align.Start;
             label.xalign = 0;
@@ -98,39 +100,38 @@ string nodeToMarkup(ref Document doc, ref const Node node)
     final switch (node.type) with (NodeType)
     {
         case Text:
-            return escapeMarkup(cast(string) node.text);
+            return escapeMarkup(node.text);
 
-        case Bold:
-            return "<b>"~childrenMarkup(doc, node)~"</b>";
-
-        case Italic:
-            return "<i>"~childrenMarkup(doc, node)~"</i>";
-
-        case BoldItalic:
-            return "<b><i>"~childrenMarkup(doc, node)~"</i></b>";
+        case Styled:
+            string inner = childrenMarkup(doc, node);
+            if (node.hasFlag(NodeFlags.Bold))
+                inner = "<b>"~inner~"</b>";
+            if (node.hasFlag(NodeFlags.Italic))
+                inner = "<i>"~inner~"</i>";
+            return inner;
 
         case Link:
             return node.text.length > 0
-                ? escapeMarkup(cast(string) node.text)
-                : escapeMarkup(cast(string) node.target);
+                ? escapeMarkup(node.text)
+                : escapeMarkup(node.target);
 
         case ExtLink:
             string display = node.text.length > 0
-                ? escapeMarkup(cast(string) node.text)
-                : escapeMarkup(cast(string) node.target);
-            return `<a href="`~escapeMarkup(cast(string) node.target)~`">`~display~`</a>`;
+                ? escapeMarkup(node.text)
+                : escapeMarkup(node.target);
+            return `<a href="`~escapeMarkup(node.target)~`">`~display~`</a>`;
 
         case LineBreak:
             return "\n";
 
         case NoWiki:
-            return escapeMarkup(cast(string) node.text);
+            return escapeMarkup(node.text);
 
         case HtmlTag:
-            return htmlTagToMarkup(cast(string) node.text);
+            return htmlTagToMarkup(node.text);
 
         case Template:
-            return templateToMarkup(cast(string) node.text);
+            return templateToMarkup(node.text);
 
         case Reference:
         case Comment:
@@ -174,12 +175,10 @@ void renderNode(ref Document doc, ref const Node node, Box container)
 
         case Text:
             if (node.text.length > 0)
-                container.append(makeLabel(escapeMarkup(cast(string) node.text), false));
+                container.append(makeLabel(escapeMarkup(node.text), false));
             break;
 
-        case Bold:
-        case Italic:
-        case BoldItalic:
+        case Styled:
         case Link:
         case ExtLink:
         case NoWiki:
@@ -202,7 +201,7 @@ void renderNode(ref Document doc, ref const Node node, Box container)
             break;
 
         case Preformatted:
-            auto preLabel = new Label(cast(string) node.text);
+            Label preLabel = new Label(node.text);
             preLabel.addCssClass("article-preformatted");
             preLabel.halign = Align.Start;
             preLabel.xalign = 0;
@@ -213,7 +212,7 @@ void renderNode(ref Document doc, ref const Node node, Box container)
             break;
 
         case HorizontalRule:
-            auto separator = new Box(Orientation.Horizontal, 0);
+            Box separator = new Box(Orientation.Horizontal, 0);
             separator.addCssClass("article-hr");
             separator.hexpand = true;
             separator.heightRequest = 1;
@@ -221,7 +220,7 @@ void renderNode(ref Document doc, ref const Node node, Box container)
             break;
 
         case BlockQuote:
-            auto quoteBox = new Box(Orientation.Vertical, 0);
+            Box quoteBox = new Box(Orientation.Vertical, 0);
             quoteBox.addCssClass("article-blockquote");
             quoteBox.hexpand = true;
             quoteBox.marginStart = 24;
@@ -271,7 +270,7 @@ string childrenMarkup(ref Document doc, ref const Node parent)
     if (!parent.hasChildren)
     {
         if (parent.text.length > 0)
-            return escapeMarkup(cast(string) parent.text);
+            return escapeMarkup(parent.text);
         return "";
     }
 
@@ -378,13 +377,9 @@ void renderDefinitionList(ref Document doc, ref const Node defList, Box containe
 void renderTable(ref Document doc, ref const Node table, Box container)
 {
     import std.string : toLower, strip;
-    import std.stdio : writeln, writef;
-    import std.conv : to;
 
     if (!table.hasChildren)
         return;
-
-    writeln("[Table] Rendering table with ", table.childEnd - table.childStart, " direct children");
 
     // First pass: collect rows as markup strings, track headers.
     string[][] rowData;
@@ -398,7 +393,7 @@ void renderTable(ref Document doc, ref const Node table, Box container)
         {
             caption = childrenMarkup(doc, doc.nodes[ti]);
             if (caption.length == 0)
-                caption = cast(string) doc.nodes[ti].text;
+                caption = doc.nodes[ti].text;
             ti = doc.nextSiblingIdx(ti);
             continue;
         }
@@ -428,9 +423,6 @@ void renderTable(ref Document doc, ref const Node table, Box container)
 
         if (cells.length > 0)
         {
-            writeln("[Table] Row ", rowData.length, " (hdr=", hdr, "): ", cells.length, " cells");
-            foreach (j, c; cells)
-                writeln("[Table]   cell[", j, "] len=", c.length, " '", c.length > 60 ? c[0..60]~"..." : c, "'");
             rowData ~= cells;
             rowIsHeader ~= hdr;
         }
@@ -607,6 +599,32 @@ string sanitizePangoMarkup(string text)
     return ret;
 }
 
+/// Extract display text from known templates, empty for others.
+/// abbrlink and abbr templates use the first param as the abbreviation.
+string templateToMarkup(string text)
+{
+    import std.string : indexOf;
+
+    if (text.length == 0)
+        return "";
+
+    // Find template name (text before first |).
+    ptrdiff_t pipePos = text.indexOf('|');
+    if (pipePos < 0)
+        return "";
+
+    string name = text[0..pipePos];
+    if (name == "abbrlink" || name == "abbr")
+    {
+        // First param is the display abbreviation.
+        string rest = text[pipePos + 1..$];
+        ptrdiff_t nextPipe = rest.indexOf('|');
+        string display = nextPipe >= 0 ? rest[0..nextPipe] : rest;
+        return escapeMarkup(display);
+    }
+    return "";
+}
+
 /// Convert a recognized HTML tag to its Pango markup equivalent.
 /// Unrecognized tags are dropped (return "").
 string htmlTagToMarkup(string tag)
@@ -735,6 +753,11 @@ string escapeMarkup(string text)
             else if (idx + 6 < text.length && text[idx..idx + 7] == "&mdash;")
             {
                 ret ~= '\u2014';
+                idx += 6;
+            }
+            else if (idx + 6 < text.length && text[idx..idx + 7] == "&minus;")
+            {
+                ret ~= '\u2212';
                 idx += 6;
             }
             else

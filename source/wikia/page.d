@@ -1,8 +1,13 @@
 module wikia.page;
 
+import std.array : join;
+import std.algorithm : canFind, map;
+
 import wikia.text.ast;
-import wikia.text.wikitext : parseWikitext;
+import wikia.text.wiki : parseWikitext;
 import wikia.text.xml : parseXml;
+import wikia.pubchem.compound : Compound;
+import infer.config : config;
 
 /// Lightweight section view derived from the AST, for backward compat.
 struct Section
@@ -43,7 +48,7 @@ public:
 
     static Page fromRaw(string title, string source, string rawContent)
     {
-        auto p = new Page();
+        Page p = new Page();
         p.title = title;
         p.source = source;
         p._raw = rawContent;
@@ -94,7 +99,7 @@ public:
     {
         if (_sections.length == 0)
         {
-            auto doc = document();
+            Document doc = document();
             if (doc.nodes.length > 0)
                 _sections = flattenSections(doc);
         }
@@ -104,9 +109,7 @@ public:
     /// Full plain-text content.
     string fulltext()
     {
-        import std.array : join;
-        import std.algorithm : map;
-        auto secs = sections();
+        Section[] secs = sections();
         if (secs.length == 0)
             return "";
         return secs.map!(s => s.content).join("\n\n");
@@ -115,11 +118,35 @@ public:
     /// Plain text of everything before the first section heading.
     string preamble()
     {
-        auto doc = document();
+        Document doc = document();
         if (doc.nodes.length == 0)
             return "";
         return doc.preambleText();
     }
+}
+
+/// Resolve pages for a compound from all enabled sources.
+Page[] resolvePage(Compound compound)
+{
+    Page[] ret;
+
+    if (config.enabledSources.canFind("wikipedia"))
+    {
+        import wikia.wikipedia : resolvePage_ = resolvePage;
+        Page page = resolvePage_(compound);
+        if (page !is null)
+            ret ~= page;
+    }
+
+    if (config.enabledSources.canFind("psychonaut"))
+    {
+        import wikia.psychonaut : resolvePage_ = resolvePage;
+        Page page = resolvePage_(compound);
+        if (page !is null)
+            ret ~= page;
+    }
+
+    return ret;
 }
 
 /// Extract a flat Section[] from a Document AST.
@@ -143,7 +170,7 @@ private void collectSection(ref Document doc, ref const Node sec, ref Section[] 
 {
     string content = doc.extractText(sec);
     ret ~= Section(
-        cast(string) sec.text,
+        sec.text,
         content,
         cast(int) sec.level
     );

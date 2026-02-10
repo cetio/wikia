@@ -15,15 +15,13 @@ import gtk.types : Orientation, Align;
 
 import gui.background : Background;
 import gui.loading : makeLoadingDots;
-import gui.settings : SettingsWindow;
 import wikia.pubchem;
 
-class Homepage : Box
+class HomeView : Box
 {
 private:
     Compound[] compounds;
     SearchEntry searchEntry;
-    SettingsWindow settingsWindow;
     ListBox suggestionList;
     bool isLoading;
 
@@ -36,7 +34,7 @@ private:
 
         if (isPrimary && loading)
         {
-            auto dots = makeLoadingDots();
+            Box dots = makeLoadingDots();
             dots.valign = Align.Center;
             row.append(dots);
         }
@@ -77,7 +75,7 @@ private:
         void* data = row.getData("compound");
         if (data !is null)
         {
-            auto c = cast(Compound)data;
+            Compound c = cast(Compound)data;
             if (c !is null)
             {
                 onCompoundSelected(index, c);
@@ -113,7 +111,7 @@ public:
         center.valign = Align.Center;
 
         Box content = new Box(Orientation.Vertical, 0);
-        content.addCssClass("homepage-content");
+        content.addCssClass("home-content");
         content.halign = Align.Center;
         content.valign = Align.Start;
 
@@ -121,28 +119,28 @@ public:
         Box logo = new Box(Orientation.Horizontal, 0);
         logo.halign = Align.Center;
         Label logoW = new Label("Wik");
-        logoW.addCssClass("homepage-logo");
+        logoW.addCssClass("home-logo");
         Label logoI = new Label("ia");
-        logoI.addCssClass("homepage-logo");
-        logoI.addCssClass("homepage-logo-accent");
+        logoI.addCssClass("home-logo");
+        logoI.addCssClass("home-logo-accent");
         logo.append(logoW);
         logo.append(logoI);
         content.append(logo);
 
         Label tagline = new Label("The free chemical compound database");
-        tagline.addCssClass("homepage-tagline");
+        tagline.addCssClass("home-tagline");
         tagline.halign = Align.Center;
         content.append(tagline);
 
         // Search bar
         Box searchBox = new Box(Orientation.Horizontal, 0);
-        searchBox.addCssClass("homepage-search-box");
+        searchBox.addCssClass("home-search-box");
         searchBox.halign = Align.Center;
         searchBox.widthRequest = 600;
 
         searchEntry = new SearchEntry();
         searchEntry.placeholderText = "Search for a compound...";
-        searchEntry.addCssClass("homepage-search-entry");
+        searchEntry.addCssClass("home-search-entry");
         searchEntry.hexpand = true;
         searchEntry.halign = Align.Fill;
         searchEntry.connectActivate(&submitSearch);
@@ -150,7 +148,7 @@ public:
 
         Button searchBtn = new Button();
         searchBtn.iconName = "system-search-symbolic";
-        searchBtn.addCssClass("homepage-search-button");
+        searchBtn.addCssClass("home-search-button");
         searchBtn.connectClicked(&submitSearch);
         searchBox.append(searchBtn);
         content.append(searchBox);
@@ -164,12 +162,12 @@ public:
 
         // Footer links
         Box links = new Box(Orientation.Horizontal, 16);
-        links.addCssClass("homepage-links");
+        links.addCssClass("home-links");
         links.halign = Align.Center;
         links.marginTop = 24;
         links.append(new Label("Powered by"));
         Label pubchemLink = new Label("PUBCHEM");
-        pubchemLink.addCssClass("homepage-link");
+        pubchemLink.addCssClass("home-link");
         links.append(pubchemLink);
 
         Button settingsBtn = new Button();
@@ -177,11 +175,8 @@ public:
         settingsBtn.tooltipText = "Settings";
         settingsBtn.addCssClass("settings-button");
         settingsBtn.connectClicked(() {
-            import gtk.window : Window;
-            Window parent = cast(Window)getRoot();
-            if (settingsWindow is null)
-                settingsWindow = new SettingsWindow(parent);
-            settingsWindow.open();
+            import gui.wikia : WikiaWindow;
+            WikiaWindow.instance.goSettings();
         });
         links.append(settingsBtn);
         content.append(links);
@@ -201,7 +196,7 @@ public:
         foreach (c; similar)
         {
             compounds ~= c;
-            auto row = new ListBoxRow();
+            ListBoxRow row = new ListBoxRow();
             row.setData("compound", cast(void*)c);
             row.setChild(buildResultRow(c, false));
             suggestionList.append(row);
@@ -211,7 +206,7 @@ public:
         // Update primary row to remove loading dots
         if (suggestionList.getFirstChild() !is null && compounds.length > 0)
         {
-            auto primaryRow = cast(ListBoxRow)suggestionList.getFirstChild();
+            ListBoxRow primaryRow = cast(ListBoxRow)suggestionList.getFirstChild();
             if (primaryRow !is null)
                 primaryRow.setChild(buildResultRow(compounds[0], true, false));
         }
@@ -266,7 +261,7 @@ public:
         bool showLoading = similar is null;
         isLoading = showLoading;
 
-        auto primaryRow = new ListBoxRow();
+        ListBoxRow primaryRow = new ListBoxRow();
         primaryRow.setChild(buildResultRow(compound, true, showLoading));
         suggestionList.append(primaryRow);
 

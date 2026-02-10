@@ -17,11 +17,10 @@ string _lastEndpoint;
 
 OpenAI client()
 {
-    auto cfg = config();
-    if (_client is null || _lastEndpoint != cfg.endpoint)
+    if (_client is null || _lastEndpoint != config.endpoint)
     {
-        _client = new OpenAI(cfg.endpoint);
-        _lastEndpoint = cfg.endpoint;
+        _client = new OpenAI(config.endpoint);
+        _lastEndpoint = config.endpoint;
         _client.available();
     }
     return _client;
@@ -143,8 +142,6 @@ void embedAll(SourceSection[] sections)
     if (sections.length == 0)
         return;
 
-    auto cfg = config();
-
     string[] texts;
     foreach (ref s; sections)
     {
@@ -154,7 +151,7 @@ void embedAll(SourceSection[] sections)
 
     try
     {
-        auto embeddings = client.embeddings!float(cfg.embedModel, texts);
+        auto embeddings = client.embeddings!float(config.embedModel, texts);
         foreach (i, ref s; sections)
         {
             s.embedding = embeddings[i * 2].value;
@@ -172,8 +169,7 @@ SourceSection[][] groupSections(SourceSection[] sections)
     if (sections.length == 0)
         return [];
 
-    auto cfg = config();
-    float threshold = cfg.groupingThreshold;
+    float threshold = config.groupingThreshold;
 
     if (sections[0].embedding.length == 0)
         return groupByHeading(sections);
@@ -242,8 +238,6 @@ Section resolveGroup(SourceSection[] group)
     if (group.length == 1)
         return Section(heading, group[0].content, level);
 
-    auto cfg = config();
-
     bool allSimilar = true;
     if (group[0].contentEmbedding.length > 0)
     {
@@ -256,7 +250,7 @@ Section resolveGroup(SourceSection[] group)
             }
             float sim = cosineSimilarity(
                 group[0].contentEmbedding, group[i].contentEmbedding);
-            if (sim < cfg.dedupeThreshold)
+            if (sim < config.dedupeThreshold)
             {
                 allSimilar = false;
                 break;
@@ -283,13 +277,11 @@ Section resolveGroup(SourceSection[] group)
 
 Section mergeViaLLM(string heading, int level, SourceSection[] group)
 {
-    auto cfg = config();
-
     string[] parts;
     int totalLen;
     foreach (ref s; group)
     {
-        int allowed = cfg.maxMergeChars / cast(int) group.length;
+        int allowed = config.maxMergeChars / cast(int) group.length;
         string text = s.content.length > allowed
             ? s.content[0..allowed] : s.content;
         parts ~= "["~s.origin~"]\n"~text;
@@ -306,7 +298,7 @@ Section mergeViaLLM(string heading, int level, SourceSection[] group)
 
     try
     {
-        auto model = client.fetch(cfg.chatModel);
+        auto model = client.fetch(config.chatModel);
         model.maxTokens = 2048;
         model.temperature = 0.2;
 
@@ -325,7 +317,7 @@ Section mergeViaLLM(string heading, int level, SourceSection[] group)
         messages.array ~= userMsg;
 
         writeln("[Ease]   -> LLM merge (", totalLen, " chars input)");
-        Completion completion = client.completions(cfg.chatModel, messages);
+        Completion completion = client.completions(config.chatModel, messages);
         string merged = completion.choices[0].text;
 
         if (merged.length > 0)

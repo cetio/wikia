@@ -31,7 +31,7 @@ class Background : DrawingArea
     private double maxRadius = 120.0;
     private double minAlpha = 0.15;
     private double maxAlpha = 0.35;
-    private string cssClass = "homepage-background";
+    private string cssClass = "home-background";
 
     this(int maxSplotches = 40, 
         int msPerFrame = 100, 
@@ -40,7 +40,7 @@ class Background : DrawingArea
         double maxRadius = 120.0,
         double minAlpha = 0.15, 
         double maxAlpha = 0.35,
-        string cssClass = "homepage-background"
+        string cssClass = "home-background"
     )
     {
         this.maxSplotches = maxSplotches;

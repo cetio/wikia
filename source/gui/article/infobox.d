@@ -215,7 +215,7 @@ private:
         Widget child = details.getLastChild();
         if (child !is null)
         {
-            auto box = cast(Box)child;
+            Box box = cast(Box)child;
             if (box !is null && box.hasCssClass("loading-dots"))
                 details.remove(box);
         }
@@ -229,11 +229,11 @@ private:
         dots.marginTop = 8;
         dots.marginBottom = 8;
 
-        auto dot1 = new Label(".");
+        Label dot1 = new Label(".");
         dot1.addCssClass("dot");
-        auto dot2 = new Label(".");
+        Label dot2 = new Label(".");
         dot2.addCssClass("dot");
-        auto dot3 = new Label(".");
+        Label dot3 = new Label(".");
         dot3.addCssClass("dot");
 
         dots.append(dot1);
@@ -258,7 +258,7 @@ private:
         });
         header.addController(click);
 
-        auto motion = new EventControllerMotion();
+        EventControllerMotion motion = new EventControllerMotion();
         motion.connectMotion((double x, double y) {
             if (!header.hasCssClass("collapsible-hover"))
                 header.addCssClass("collapsible-hover");

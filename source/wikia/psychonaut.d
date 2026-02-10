@@ -69,8 +69,6 @@ public:
 
 Page resolvePage(Compound compound)
 {
-    import std.stdio : writeln;
-
     Compound[] similar = similaritySearch(compound.cid, 90, 5);
     int[] simCids;
     foreach (sim; similar)
@@ -131,15 +129,10 @@ Page resolvePage(Compound compound)
         foreach (page; simPages)
         {
             if (isExactPage(page.title, simSyns))
-            {
-                writeln("[Psychonaut] Resolved page '", page.title,
-                    "' for compound ", compound.name);
                 return page;
-            }
         }
     }
 
-    writeln("[Psychonaut] No matching page for compound ", compound.name);
     return null;
 }
 

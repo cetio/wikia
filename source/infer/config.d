@@ -13,14 +13,4 @@ struct InferConfig
     string[] enabledSources = ["wikipedia"];
 }
 
-private __gshared InferConfig _config;
-
-InferConfig config()
-{
-    return _config;
-}
-
-void setConfig(InferConfig cfg)
-{
-    _config = cfg;
-}
+__gshared InferConfig config;

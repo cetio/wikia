@@ -49,15 +49,14 @@ public:
 
 string[] extractCompoundNames(string text)
 {
-    auto cfg = config();
-    if (!cfg.autoResolveRabbitHoles)
+    if (!config.autoResolveRabbitHoles)
         return [];
 
     string trunc = text.length > 2000 ? text[0..2000] : text;
     bool[string] names;
 
     // Suffix-matched drug names (e.g. ketamine, phencyclidine, midazolam)
-    enum wordRe = ctRegex!(`[\w]{6,}`);
+    enum wordRe = ctRegex!(`\b[\w]{6,}\b`);
     foreach (m; matchAll(trunc, wordRe))
     {
         if (m.hit.hasDrugSuffix)

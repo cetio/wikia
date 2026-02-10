@@ -72,11 +72,11 @@ public:
         foreach (report; reports)
         {
             Box reportRow = new Box(Orientation.Horizontal, 0);
-            reportRow.addCssClass("report-row");
+            reportRow.addCssClass("search-result-row");
             reportRow.hexpand = true;
 
             Label titleLabel = new Label(report.title);
-            titleLabel.addCssClass("report-title");
+            titleLabel.addCssClass("search-result-title");
             titleLabel.tooltipText = report.url;
             titleLabel.halign = Align.Start;
             titleLabel.xalign = 0;

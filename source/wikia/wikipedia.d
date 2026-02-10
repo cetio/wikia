@@ -10,6 +10,7 @@ import std.functional : toDelegate;
 
 import wikia.composer;
 import wikia.page;
+import wikia.pubchem.compound : Compound;
 
 private:
 
@@ -107,6 +108,14 @@ Page[] getPagesByTitle(string DB)(string[] titles...)
             toDelegate(&_wiFetchContent));
     }
     return ret;
+}
+
+Page resolvePage(Compound compound)
+{
+    Page[] pages = getPages!"wikipedia"(compound.name, 1);
+    if (pages.length > 0)
+        return pages[0];
+    return null;
 }
 
 string[] extractCIDs(Page page)

@@ -4,8 +4,9 @@ import std.conv : to;
 import std.stdio : writeln;
 import std.regex : ctRegex, replaceAll;
 import std.array : replace;
-import std.string : toLower, strip, indexOf;
+import std.string : toLower, strip, indexOf, startsWith;
 import std.algorithm : canFind;
+import std.uni : toUpper;
 import core.thread : Thread;
 
 import gtk.box;
@@ -24,9 +25,9 @@ import gui.article.reports : Reports;
 import gui.conformer.view;
 
 import wikia.pubchem;
-import wikia.page : Page, Section;
+import wikia.page : Page, Section, resolvePage;
 import wikia.text.ast : Document, Node, NodeType;
-import wikia.psychonaut : DosageResult, resolvePage;
+import wikia.psychonaut : DosageResult;
 import infer.ease : ease, SectionCallback, HeadingsCallback;
 import infer.resolve : extractCompoundNames;
 import infer.config : config;
@@ -54,7 +55,6 @@ private:
 
 public:
     Infobox infobox;
-    void delegate() onGoHome;
     void delegate(string compoundName) onCompoundNavigate;
 
     this()
@@ -128,8 +128,9 @@ public:
         homeBtn.tooltipText = "Back to home";
         homeBtn.addCssClass("nav-home-button");
         homeBtn.connectClicked(() {
+            import gui.wikia : WikiaWindow;
             navHistory = null;
-            if (onGoHome !is null) onGoHome();
+            WikiaWindow.instance.goHome();
         });
         homeBtn.halign = Align.End;
         homeBtn.valign = Align.Center;
@@ -169,7 +170,8 @@ public:
         }
         else
         {
-            if (onGoHome !is null) onGoHome();
+            import gui.wikia : WikiaWindow;
+            WikiaWindow.instance.goHome();
         }
     }
 
@@ -223,26 +225,7 @@ private:
 
     Page[] fetchPages()
     {
-        import wikia.wikipedia : getPages;
-
-        auto cfg = config();
-        Page[] result;
-
-        if (cfg.enabledSources.canFind("wikipedia"))
-        {
-            Page[] wikiPages = getPages!"wikipedia"(compound.name, 1);
-            if (wikiPages.length > 0)
-                result ~= wikiPages[0];
-        }
-
-        if (cfg.enabledSources.canFind("psychonaut"))
-        {
-            Page psPage = resolvePage(compound);
-            if (psPage !is null)
-                result ~= psPage;
-        }
-
-        return result;
+        return resolvePage(compound);
     }
 
     Label makeTextLabel(string text, bool markup = false)
@@ -281,7 +264,7 @@ private:
 
     void populateFromAST(Expander exp, Page page, ref const Node secNode)
     {
-        auto doc = page.document();
+        Document doc = page.document();
         if (doc.nodes.length == 0 || !secNode.hasChildren)
         {
             Label empty = new Label("No content.");
@@ -305,8 +288,7 @@ private:
                 // Subsection: render heading + recurse into children.
                 if (doc.nodes[ci].text.length > 0)
                 {
-                    import std.uni : toUpper;
-                    Label subHead = new Label((cast(string) doc.nodes[ci].text).toUpper);
+                    Label subHead = new Label(doc.nodes[ci].text.toUpper);
                     subHead.addCssClass("article-subheading");
                     subHead.halign = Align.Start;
                     subHead.xalign = 0;
@@ -333,11 +315,11 @@ private:
             string raw = page.raw;
             if (raw is null || raw.length == 0) continue;
 
-            auto doc = page.document();
+            Document doc = page.document();
             if (doc.nodes.length == 0) continue;
 
             // Render preamble via AST nodes.
-            auto preambleNodes = doc.preamble();
+            Node[] preambleNodes = doc.preamble();
             if (preambleNodes.length > 0)
             {
                 hadIntro = true;
@@ -348,7 +330,7 @@ private:
             // Render sections as expanders using the AST.
             foreach (ref secNode; doc.sections())
             {
-                string heading = cast(string) secNode.text;
+                string heading = secNode.text;
                 if (isExcludedHeading(heading))
                     continue;
 
@@ -368,6 +350,9 @@ private:
                 resolveCompoundLinks(lbl, desc);
             }
         }
+        // Resolve compound links on all AST-rendered labels.
+        resolveLinksInContainer(synthesisBody);
+
         writeln("[ArticleView] Direct render complete");
     }
 
@@ -384,10 +369,8 @@ private:
         try
         {
             if (compound is null) return;
-
-            auto cfg = config();
             writeln("[ArticleView] Starting synthesis for: ", compound.name,
-                " sources=", cfg.enabledSources);
+                " sources=", config.enabledSources);
 
             Page[] allPages = pages();
             writeln("[ArticleView] Fetched ", allPages.length, " pages");
@@ -402,7 +385,7 @@ private:
                 return;
             }
 
-            if (cfg.enabledSources.length <= 1)
+            if (config.enabledSources.length <= 1)
             {
                 renderDirect(allPages);
                 return;
@@ -545,7 +528,8 @@ private:
         homeBtn.tooltipText = "Back to home";
         homeBtn.addCssClass("nav-home-button");
         homeBtn.connectClicked(() {
-            if (onGoHome !is null) onGoHome();
+            import gui.wikia : WikiaWindow;
+            WikiaWindow.instance.goHome();
         });
         homeBtn.halign = Align.End;
         homeBtn.valign = Align.Center;
@@ -637,7 +621,6 @@ private:
 
     bool onLinkActivated(string uri)
     {
-        import std.string : startsWith;
         if (uri.startsWith("compound:"))
         {
             string name = uri[9..$];
@@ -649,7 +632,7 @@ private:
         return false;
     }
 
-    void resolveCompoundLinks(Label label, string plainText)
+    void resolveCompoundLinks(Label lbl, string plainText)
     {
         try
         {
@@ -658,32 +641,119 @@ private:
 
             writeln("[ArticleView] Resolved ", names.length, " compound names");
 
-            // Skip the current compound's own name
             string currentName = compound !is null ? compound.name.toLower : "";
-            string markup = linkifyUrls(plainText);
+            string markup = lbl.label; // Use existing markup
             foreach (name; names)
             {
                 if (name.toLower == currentName) continue;
                 markup = linkifyCompoundName(markup, name);
             }
-            label.label = markup;
+            lbl.label = markup;
         }
         catch (Exception e)
             writeln("[ArticleView] Compound resolve failed: ", e.msg);
     }
 
+    /// Walk a container, connect link activation and resolve compound
+    /// names on all markup labels.
+    void resolveLinksInContainer(Box container)
+    {
+        if (compound is null) return;
+        string fullText;
+
+        // Collect plain text from all labels for compound extraction.
+        void collectText(Widget w)
+        {
+            if (w is null) return;
+            Label lbl = cast(Label) w;
+            if (lbl !is null)
+            {
+                string t = lbl.getText();
+                if (t.length > 0)
+                    fullText ~= t~" ";
+            }
+            // Recurse into Box children.
+            Box box = cast(Box) w;
+            if (box !is null)
+            {
+                Widget ch = box.getFirstChild();
+                while (ch !is null)
+                {
+                    collectText(ch);
+                    ch = ch.getNextSibling();
+                }
+            }
+        }
+        collectText(container);
+
+        string[] names = extractCompoundNames(fullText);
+        if (names.length == 0) return;
+
+        writeln("[ArticleView] Resolved ", names.length, " compound names in container");
+
+        string currentName = compound.name.toLower;
+
+        // Apply links to all markup labels.
+        void applyLinks(Widget w)
+        {
+            if (w is null) return;
+            Label lbl = cast(Label) w;
+            if (lbl !is null && lbl.useMarkup)
+            {
+                lbl.connectActivateLink(&onLinkActivated);
+                string markup = lbl.label;
+                foreach (name; names)
+                {
+                    if (name.toLower == currentName) continue;
+                    markup = linkifyCompoundName(markup, name);
+                }
+                lbl.label = markup;
+            }
+            Box box = cast(Box) w;
+            if (box !is null)
+            {
+                Widget ch = box.getFirstChild();
+                while (ch !is null)
+                {
+                    applyLinks(ch);
+                    ch = ch.getNextSibling();
+                }
+            }
+        }
+        applyLinks(container);
+    }
+
+    static bool isWordChar(char c)
+    {
+        return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
+            || (c >= '0' && c <= '9') || c == '-';
+    }
+
     static string linkifyCompoundName(string markup, string name)
     {
-        import std.string : indexOf;
         string escaped = name.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
         string linked = `<a href="compound:`~name~`">`~escaped~`</a>`;
 
-        // Replace first occurrence that isn't already inside a tag
-        auto idx = markup.indexOf(escaped);
-        if (idx >= 0)
+        // Find first whole-word occurrence not inside a tag
+        ptrdiff_t searchFrom = 0;
+        while (searchFrom < markup.length)
         {
+            ptrdiff_t idx = markup[searchFrom..$].indexOf(escaped);
+            if (idx < 0) break;
+            idx += searchFrom;
+
+            // Word boundary check: reject partial matches within larger words
+            size_t matchEnd = idx + escaped.length;
+            bool leftBound = idx == 0 || !isWordChar(markup[idx - 1]);
+            bool rightBound = matchEnd >= markup.length || !isWordChar(markup[matchEnd]);
+
+            if (!leftBound || !rightBound)
+            {
+                searchFrom = idx + 1;
+                continue;
+            }
+
             // Check we're not inside an existing <a> tag
-            bool insideTag = false;
             int openTags = 0;
             foreach (i; 0..idx)
             {
@@ -691,7 +761,12 @@ private:
                 if (markup[i] == '>') openTags--;
             }
             if (openTags <= 0)
-                markup = markup[0..idx]~linked~markup[idx + escaped.length..$];
+            {
+                markup = markup[0..idx]~linked~markup[matchEnd..$];
+                break;
+            }
+
+            searchFrom = idx + 1;
         }
         return markup;
     }

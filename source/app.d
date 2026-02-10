@@ -1,231 +1,34 @@
 module app;
 
-import std.conv : to;
 import std.file : exists, readText;
 import std.stdio : writeln;
-import std.algorithm;
-import std.array;
-import std.string : strip;
-import core.thread;
 
 import gio.types : ApplicationFlags;
 import gtk.application;
-import gtk.application_window;
-import gtk.header_bar;
-import gtk.label;
-import gtk.button;
-import gtk.box;
-import gtk.overlay;
-import gtk.stack;
 import gtk.css_provider;
 import gtk.style_context;
-import gtk.style_provider;
 import gdk.display;
-import gtk.types : Orientation, Align, PolicyType, STYLE_PROVIDER_PRIORITY_APPLICATION, EventControllerScrollFlags;
+import gtk.types : STYLE_PROVIDER_PRIORITY_APPLICATION;
 
-import wikia.pubchem;
-import wikia.psychonaut : DosageResult, getDosage;
-
-import gui.background;
-import gui.home;
-import gui.article;
-import gui.conformer.view;
+import gui.wikia : WikiaWindow;
 
 immutable string cssPath = "resources/style.css";
 
-class WikiaWindow : gtk.application_window.ApplicationWindow
-{
-private:
-    Stack stack;
-    Homepage homepage;
-    ArticleView article;
-
-    Compound lastSearchCompound;
-    Overlay windowOverlay;
-    Label titleLabel;
-
-public:
-    this(gtk.application.Application app)
-    {
-        super(app);
-        setDefaultSize(1200, 800);
-        setTitle("Wikia");
-
-        HeaderBar header = new HeaderBar();
-        header.showTitleButtons = true;
-        titleLabel = new Label("Wikia");
-        header.titleWidget = titleLabel;
-        setTitlebar(header);
-
-        windowOverlay = new Overlay();
-        windowOverlay.hexpand = true;
-        windowOverlay.vexpand = true;
-
-        stack = new Stack();
-        stack.hexpand = true;
-        stack.vexpand = true;
-
-        homepage = new Homepage();
-        homepage.onSearch = &doSearch;
-        homepage.onCompoundSelected = &onCompoundSelected;
-        stack.addNamed(homepage, "homepage");
-
-        article = new ArticleView();
-        article.onGoHome = &showHome;
-        article.onCompoundNavigate = &onCompoundNavigate;
-        stack.addNamed(article, "article");
-
-        stack.visibleChildName = "homepage";
-
-        Box root = new Box(Orientation.Vertical, 0);
-        root.addCssClass("root-container");
-        root.hexpand = true;
-        root.vexpand = true;
-        root.append(stack);
-        windowOverlay.setChild(root);
-
-        setChild(windowOverlay);
-    }
-
-
-    private void doSearch(string query)
-    {
-        string q = query.strip;
-        writeln("[App] doSearch called with query: ", q);
-        if (q.length < 2)
-            return;
-
-        lastSearchCompound = getProperties(q);
-        
-        if (lastSearchCompound is null)
-        {
-            writeln("[App] No compound found");
-            homepage.displayResults(q, lastSearchCompound);
-            return;
-        }
-        
-        writeln("[App] Displaying primary dosage");
-        homepage.displayResults(q, lastSearchCompound, null);
-        
-        // Spawn thread for similarity search
-        Thread similarSearchThread = new Thread({
-            try
-            {
-                Compound[] similarCompounds = similaritySearch(lastSearchCompound.cid, 85, 10);
-                
-                // Filter out duplicates and limit results
-                Compound[] filtered;
-                foreach (compound; similarCompounds)
-                {
-                    if (compound.cid != lastSearchCompound.cid)
-                        filtered ~= compound;
-                }
-                
-                if (filtered.length > 4)
-                    filtered = filtered[0..4];
-                
-                // Small delay to ensure UI is ready
-                Thread.sleep(100.msecs);
-                
-                // Update UI
-                writeln("[App] Adding ", filtered.length, " similar compounds");
-                homepage.addSimilarResults(filtered);
-            }
-            catch (Exception e)
-                writeln("[App] Similarity search failed: ", e.msg);
-        });
-        similarSearchThread.start();
-    }
-
-    private void onCompoundSelected(int index, Compound compound)
-    {
-        writeln("[App] onCompoundSelected called with index: ", index, ", CID: ", compound.cid);
-        if (compound is null)
-        {
-            writeln("[App] No compound selected");
-            return;
-        }
-
-        lastSearchCompound = compound;
-        article.fromCompound(compound);
-        showArticle();
-
-        Thread dosageThread = new Thread({
-            try
-            {
-                writeln("[App] Fetching dosage for CID ", compound.cid);
-                DosageResult dosage = getDosage(compound);
-                writeln("[App] Dosage dosage: ", dosage.dosages.length,
-                    " routes, source=", dosage.source ? dosage.source.name : "primary");
-                article.infobox.setDosage(dosage);
-            }
-            catch (Exception e)
-                writeln("[App] Dosage fetch failed: ", e.msg);
-        });
-        dosageThread.start();
-
-        writeln("[App] onCompoundSelected completed");
-    }
-
-    private void showArticle()
-    {
-        stack.visibleChildName = "article";
-    }
-
-    private void onCompoundNavigate(string compoundName)
-    {
-        writeln("[App] Navigating to compound: ", compoundName);
-        Thread navThread = new Thread({
-            try
-            {
-                Compound c = getProperties(compoundName);
-                if (c is null)
-                {
-                    writeln("[App] Compound not found: ", compoundName);
-                    return;
-                }
-                lastSearchCompound = c;
-                article.fromCompound(c);
-
-                DosageResult dosage = getDosage(c);
-                article.infobox.setDosage(dosage);
-            }
-            catch (Exception e)
-                writeln("[App] Compound navigate failed: ", e.msg);
-        });
-        navThread.start();
-    }
-
-    private void showHome()
-    {
-        titleLabel.label = "Wikia";
-        stack.visibleChildName = "homepage";
-        lastSearchCompound = null;
-        article.clearArticle();
-        homepage.clearResults();
-    }
-
-}
-
-class WikiaApp : gtk.application.Application
+class WikiaApp : Application
 {
 private:
     CssProvider cssProvider;
-
 
     void applyCss()
     {
         cssProvider = new CssProvider();
         if (cssPath.exists)
-        {
-            string css = cssPath.readText;
-            cssProvider.loadFromString(css);
-        }
+            cssProvider.loadFromString(cssPath.readText);
         else
             writeln("Warning: CSS file not found at "~cssPath);
 
-        Display display = Display.getDefault();
-        StyleContext.addProviderForDisplay(display, cssProvider, STYLE_PROVIDER_PRIORITY_APPLICATION);
+        StyleContext.addProviderForDisplay(
+            Display.getDefault(), cssProvider, STYLE_PROVIDER_PRIORITY_APPLICATION);
     }
 
     void onActivate()

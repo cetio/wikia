@@ -27,7 +27,7 @@ class Compound
         if (auto p = cid in registry)
             return *p;
 
-        auto c = new Compound(cid);
+        Compound c = new Compound(cid);
         registry[cid] = c;
         return c;
     }
@@ -102,7 +102,7 @@ public:
     {
         if (_description is null)
         {
-            auto descs = getDescription!"cid"(cid);
+            string[] descs = getDescription!"cid"(cid);
             foreach (d; descs)
             {
                 if (d.length > 0)

@@ -2,8 +2,8 @@ module wikia.text.ast;
 
 /// Unified AST for both Wikitext and XML document formats.
 /// Memory-efficient: nodes use slices into the original source string
-/// wherever possible, avoiding copies. Children are stored as slices
-/// of a flat array owned by the Document.
+/// wherever possible, avoiding copies. Children are stored as index
+/// ranges into a flat array owned by the Document.
 
 enum NodeType : ubyte
 {
@@ -14,9 +14,7 @@ enum NodeType : ubyte
 
     // Inline
     Text,
-    Bold,
-    Italic,
-    BoldItalic,
+    Styled,
     Link,
     ExtLink,
     Image,
@@ -47,28 +45,39 @@ enum NodeType : ubyte
     Math,
 }
 
+/// Bitflags for node modifiers. Applied to `Styled` nodes and
+/// potentially others. Combined freely: `Bold | Italic`.
+enum NodeFlags : ubyte
+{
+    None    = 0,
+    Bold    = 1 << 0,
+    Italic  = 1 << 1,
+}
+
 struct Node
 {
     NodeType type;
 
     /// Slice into original source (zero-copy for text content).
-    const(char)[] text;
+    string text;
+
+    NodeFlags flags;
 
     /// For Section: heading level (2-6). For ListItem: nesting depth.
     ubyte level;
 
     /// For Link/ExtLink: target URL or page name.
-    const(char)[] target;
+    string target;
 
     /// Child node range: indices into Document.nodes.
     uint childStart;
     uint childEnd;
 
-    Node[] children(return ref const(Node)[] allNodes) return
+    Node[] children(return ref Node[] allNodes) return
     {
         if (childStart >= childEnd)
             return [];
-        return cast(Node[]) allNodes[childStart..childEnd];
+        return allNodes[childStart..childEnd];
     }
 
     bool hasChildren() const pure nothrow @nogc
@@ -79,6 +88,11 @@ struct Node
     uint childCount() const pure nothrow @nogc
     {
         return childEnd - childStart;
+    }
+
+    bool hasFlag(NodeFlags f) const pure nothrow @nogc
+    {
+        return (flags & f) != NodeFlags.None;
     }
 }
 
@@ -98,17 +112,14 @@ struct Document
     }
 
     /// Advance past a node's subtree to find the next sibling index.
-    /// In the flat array, childStart..childEnd spans all descendants.
     uint nextSiblingIdx(uint i) const pure nothrow @nogc
     {
         return nodes[i].hasChildren ? nodes[i].childEnd : i + 1;
     }
 
     /// Recursively extract visible plain text from a node subtree.
-    /// Skips templates, comments, references, categories, images, etc.
     string extractText(ref const Node node)
     {
-        // Skip non-visible node types entirely.
         switch (node.type) with (NodeType)
         {
             case Template:
@@ -125,15 +136,14 @@ struct Document
         }
 
         if (node.type == NodeType.Text || node.type == NodeType.NoWiki)
-            return cast(string) node.text;
+            return node.text;
 
-        // For Link/ExtLink: return display text.
         if (node.type == NodeType.Link || node.type == NodeType.ExtLink)
         {
             if (node.text.length > 0)
-                return cast(string) node.text;
+                return node.text;
             if (node.target.length > 0)
-                return cast(string) node.target;
+                return node.target;
             return "";
         }
 
@@ -146,18 +156,18 @@ struct Document
         if (!node.hasChildren)
         {
             if (node.type == NodeType.Preformatted || node.type == NodeType.Section)
-                return node.text.length > 0 ? cast(string) node.text : "";
+                return node.text.length > 0 ? node.text : "";
             return "";
         }
 
-        string result;
+        string ret;
         uint i = node.childStart;
         while (i < node.childEnd)
         {
-            result ~= extractText(nodes[i]);
+            ret ~= extractText(nodes[i]);
             i = nextSiblingIdx(i);
         }
-        return result;
+        return ret;
     }
 
     /// Get top-level sections (direct children of root with type Section).
@@ -196,15 +206,14 @@ struct Document
     /// Extract plain text from the preamble nodes.
     string preambleText()
     {
-        string result;
+        string ret;
         foreach (ref n; preamble())
-            result ~= extractText(n);
-        return result;
+            ret ~= extractText(n);
+        return ret;
     }
 
     /// Drop all nodes of the specified types (and their subtrees)
     /// from the document, rebuilding the flat array in-place.
-    /// `flags` is a bitmask of NodeType values to drop.
     void drop(uint flags)
     {
         if (nodes.length <= 1)
@@ -212,10 +221,8 @@ struct Document
 
         Node[] ret;
         ret.reserve(nodes.length);
-        ret ~= Node(NodeType.Document); // root
+        ret ~= Node(NodeType.Document);
 
-        // Recursively copy, skipping dropped types.
-        // Preserve all children inside table cells and headers.
         void copyChildren(uint start, uint end, uint parentIdx)
         {
             uint newChildStart = cast(uint) ret.length;
@@ -227,7 +234,6 @@ struct Document
             {
                 if (!preserve && (1u << nodes[i].type) & flags)
                 {
-                    // Skip this node and its subtree.
                     i = nodes[i].hasChildren ? nodes[i].childEnd : i + 1;
                     continue;
                 }

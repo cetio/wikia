@@ -5,13 +5,13 @@
     color: #202122;
 }
 
-/* Homepage */
-.homepage-content {
+/* Home */
+.home-content {
     padding: 0 24px;
     background: transparent;
 }
 
-.homepage-logo {
+.home-logo {
     color: #202122;
     font-size: 3.5em;
     font-weight: 400;
@@ -19,28 +19,24 @@
     margin-bottom: 8px;
 }
 
-.homepage-logo-accent {
+.home-logo-accent {
     color: #3366cc;
 }
 
-.homepage-tagline {
+.home-tagline {
     color: #72777d;
     font-size: 1.1em;
     margin-bottom: 32px;
 }
 
-.homepage-search-box {
+.home-search-box {
     background: rgba(255, 255, 255, 0.9);
     border: 1px solid #a2a9b1;
     border-radius: 4px;
     padding: 4px;
 }
 
-.homepage-search-box:focus-within {
-    border-color: #3366cc;
-}
-
-.homepage-search-entry {
+.home-search-entry {
     min-height: 28px;
     padding: 4px 12px;
     font-size: 1.05em;
@@ -49,11 +45,11 @@
     color: #202122;
 }
 
-.homepage-search-entry:focus {
+.home-search-entry:focus {
     outline: none;
 }
 
-.homepage-search-button {
+.home-search-button {
     background: #3366cc;
     color: #ffffff;
     border-radius: 4px;
@@ -62,17 +58,17 @@
     min-height: 36px;
 }
 
-.homepage-search-button:hover {
+.home-search-button:hover {
     background: #2a56a8;
 }
 
-.homepage-links {
+.home-links {
     margin-top: 24px;
     font-size: 0.9em;
     color: #72777d;
 }
 
-.homepage-link {
+.home-link {
     color: #3366cc;
     font-size: 0.8em;
     font-weight: 600;
@@ -80,7 +76,7 @@
     letter-spacing: 0.5px;
 }
 
-.homepage-source {
+.home-source {
     font-size: 0.8em;
     font-weight: 600;
     color: #72777d;
