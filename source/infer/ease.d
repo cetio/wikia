@@ -69,7 +69,7 @@ SourceSection[] extractSections(Page[] pages)
         writeln("[Ease] Processing page: ", page.title, " (", page.source, ")");
 
         string preamble = page.preamble;
-        if (preamble.length > MIN_CONTENT_LENGTH)
+        if (preamble.length > minContentLength)
         {
             all ~= SourceSection("Introduction", preamble, 2, page.source);
             writeln("[Ease]   + Introduction (", preamble.length, " chars)");
@@ -85,7 +85,7 @@ SourceSection[] extractSections(Page[] pages)
         {
             if (currentParent.length == 0)
                 return;
-            if (currentContent.length >= MIN_CONTENT_LENGTH && !isExcluded(currentParent))
+            if (currentContent.length >= minContentLength && !isExcluded(currentParent))
             {
                 all ~= SourceSection(currentParent, currentContent, 2, page.source);
                 writeln("[Ease]   + '", currentParent, "' (",
@@ -121,7 +121,7 @@ SourceSection[] extractSections(Page[] pages)
                 }
                 else
                 {
-                    if (sec.content.length >= MIN_CONTENT_LENGTH
+                    if (sec.content.length >= minContentLength
                         && !isExcluded(sec.heading))
                     {
                         all ~= SourceSection(sec.heading, sec.content, 2, page.source);
