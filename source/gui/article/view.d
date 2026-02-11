@@ -305,7 +305,8 @@ private:
 
     void renderDirect(Page[] pages)
     {
-        if (synthesisBody is null) return;
+        if (synthesisBody is null)
+            return;
         clearSynthesisLoading();
 
         bool hadIntro;
@@ -313,10 +314,12 @@ private:
         foreach (page; pages)
         {
             string raw = page.raw;
-            if (raw is null || raw.length == 0) continue;
+            if (raw is null || raw.length == 0)
+                continue;
 
             Document doc = page.document();
-            if (doc.nodes.length == 0) continue;
+            if (doc.nodes.length == 0)
+                continue;
 
             // Render preamble via AST nodes.
             Node[] preambleNodes = doc.preamble();
@@ -358,7 +361,9 @@ private:
 
     void clearSynthesisLoading()
     {
-        if (synthesisBody is null) return;
+        if (synthesisBody is null)
+            return;
+
         Widget first = synthesisBody.getFirstChild();
         if (first !is null)
             synthesisBody.remove(first);
@@ -368,7 +373,9 @@ private:
     {
         try
         {
-            if (compound is null) return;
+            if (compound is null)
+                return;
+
             writeln("[ArticleView] Starting synthesis for: ", compound.name,
                 " sources=", config.enabledSources);
 
@@ -398,7 +405,9 @@ private:
 
             ease(compound.name,
                 (string[] headings) {
-                    if (synthesisBody is null) return;
+                    if (synthesisBody is null)
+                        return;
+                        
                     clearSynthesisLoading();
 
                     bool hasIntro;
@@ -444,7 +453,8 @@ private:
                     }
                 },
                 (size_t idx, Section sec) {
-                    if (synthesisBody is null) return;
+                    if (synthesisBody is null)
+                        return;
 
                     if (idx == introGroupIdx)
                     {
@@ -464,7 +474,8 @@ private:
                     }
 
                     size_t* pExpIdx = idx in groupToExpander;
-                    if (pExpIdx is null) return;
+                    if (pExpIdx is null)
+                        return;
 
                     Expander exp = sectionExpanders[*pExpIdx];
                     exp.setTitle(sec.heading);
@@ -637,7 +648,8 @@ private:
         try
         {
             string[] names = extractCompoundNames(plainText);
-            if (names.length == 0) return;
+            if (names.length == 0)
+                return;
 
             writeln("[ArticleView] Resolved ", names.length, " compound names");
 
@@ -645,7 +657,9 @@ private:
             string markup = lbl.label; // Use existing markup
             foreach (name; names)
             {
-                if (name.toLower == currentName) continue;
+                if (name.toLower == currentName)
+                    continue;
+
                 markup = linkifyCompoundName(markup, name);
             }
             lbl.label = markup;
@@ -658,13 +672,17 @@ private:
     /// names on all markup labels.
     void resolveLinksInContainer(Box container)
     {
-        if (compound is null) return;
+        if (compound is null)
+            return;
+
         string fullText;
 
         // Collect plain text from all labels for compound extraction.
         void collectText(Widget w)
         {
-            if (w is null) return;
+            if (w is null)
+                return;
+
             Label lbl = cast(Label) w;
             if (lbl !is null)
             {
@@ -687,7 +705,8 @@ private:
         collectText(container);
 
         string[] names = extractCompoundNames(fullText);
-        if (names.length == 0) return;
+        if (names.length == 0)
+            return;
 
         writeln("[ArticleView] Resolved ", names.length, " compound names in container");
 
@@ -696,7 +715,9 @@ private:
         // Apply links to all markup labels.
         void applyLinks(Widget w)
         {
-            if (w is null) return;
+            if (w is null)
+                return;
+
             Label lbl = cast(Label) w;
             if (lbl !is null && lbl.useMarkup)
             {
@@ -704,7 +725,9 @@ private:
                 string markup = lbl.label;
                 foreach (name; names)
                 {
-                    if (name.toLower == currentName) continue;
+                    if (name.toLower == currentName)
+                        continue;
+
                     markup = linkifyCompoundName(markup, name);
                 }
                 lbl.label = markup;

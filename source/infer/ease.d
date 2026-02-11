@@ -26,19 +26,19 @@ OpenAI client()
     return _client;
 }
 
-immutable string[] EXCLUDED_SECTIONS = [
+immutable string[] excluded = [
     "references", "external links", "further reading", "see also",
     "notes", "bibliography", "sources", "footnotes",
     "common names", "reagent results", "media", "literature",
     "experience reports", "gallery", "navigation",
 ];
 
-enum MIN_CONTENT_LENGTH = 50;
+enum minContentLength = 50;
 
 bool isExcluded(string heading)
 {
     string lower = heading.toLower;
-    foreach (ex; EXCLUDED_SECTIONS)
+    foreach (ex; excluded)
     {
         if (lower == ex)
             return true;

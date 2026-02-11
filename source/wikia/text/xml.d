@@ -451,7 +451,8 @@ private struct XmlParser
 
     void skipElement()
     {
-        if (pos >= src.length || src[pos] != '<') return;
+        if (pos >= src.length || src[pos] != '<')
+            return;
         size_t start = pos + 1;
         size_t nameEnd = start;
         while (nameEnd < src.length && src[nameEnd] != ' '

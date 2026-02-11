@@ -15,6 +15,7 @@ import gtk.types : Orientation, Align;
 
 import gui.background : Background;
 import gui.loading : makeLoadingDots;
+import gui.wikia : WikiaWindow;
 import wikia.pubchem;
 
 class HomeView : Box
@@ -61,15 +62,20 @@ private:
 
     void submitSearch()
     {
-        if (searchEntry is null) return;
+        if (searchEntry is null)
+            return;
+
         string text = searchEntry.text.strip;
-        if (text.length < 2) return;
+        if (text.length < 2)
+            return;
+
         if (onSearch !is null) onSearch(text);
     }
 
     void onRowActivated(ListBoxRow row)
     {
-        if (row is null || onCompoundSelected is null) return;
+        if (row is null || onCompoundSelected is null)
+            return;
         int index = row.getIndex();
 
         void* data = row.getData("compound");
@@ -175,7 +181,6 @@ public:
         settingsBtn.tooltipText = "Settings";
         settingsBtn.addCssClass("settings-button");
         settingsBtn.connectClicked(() {
-            import gui.wikia : WikiaWindow;
             WikiaWindow.instance.goSettings();
         });
         links.append(settingsBtn);
@@ -191,7 +196,8 @@ public:
 
     void addSimilarResults(Compound[] similar)
     {
-        if (!isLoading || similar is null || similar.length == 0) return;
+        if (!isLoading || similar is null || similar.length == 0)
+            return;
 
         foreach (c; similar)
         {

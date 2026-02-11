@@ -17,7 +17,7 @@ immutable string[] suffixes = [
 ];
 
 // Common English words that match drug suffixes but aren't compounds.
-immutable string[] exclusions = [
+immutable string[] excluded = [
     "determine", "examine", "famine", "amine", "amine",
     "machine", "routine", "pristine", "magazine", "alpine",
     "discipline", "doctrine", "medicine", "gasoline",
@@ -31,7 +31,7 @@ immutable string[] exclusions = [
 bool hasDrugSuffix(string word)
 {
     string lower = word.toLower;
-    foreach (ex; exclusions)
+    foreach (ex; excluded)
     {
         if (lower == ex)
             return false;
