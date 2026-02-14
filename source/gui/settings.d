@@ -200,8 +200,8 @@ public:
         backBtn.addCssClass("nav-home-button");
         backBtn.addCssClass("nav-back-button");
         backBtn.connectClicked(() {
-            import gui.wikia : WikiaWindow;
-            WikiaWindow.instance.goHome();
+            import gui.chemica : ChemicaWindow;
+            ChemicaWindow.instance.goHome();
         });
         backBtn.halign = Align.Start;
         backBtn.valign = Align.Center;

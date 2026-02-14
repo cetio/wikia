@@ -15,8 +15,8 @@ import gtk.types : Orientation, Align;
 
 import gui.background : Background;
 import gui.loading : makeLoadingDots;
-import gui.wikia : WikiaWindow;
-import wikia.pubchem;
+import gui.chemica : ChemicaWindow;
+import akashi.pubchem;
 
 class HomeView : Box
 {
@@ -181,7 +181,7 @@ public:
         settingsBtn.tooltipText = "Settings";
         settingsBtn.addCssClass("settings-button");
         settingsBtn.connectClicked(() {
-            WikiaWindow.instance.goSettings();
+            ChemicaWindow.instance.goSettings();
         });
         links.append(settingsBtn);
         content.append(links);

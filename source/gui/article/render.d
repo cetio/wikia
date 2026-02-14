@@ -9,8 +9,8 @@ import gtk.label;
 import gtk.types : Orientation, Align;
 import gtk.widget : Widget;
 
-import wikia.text.ast;
-import wikia.page : Page;
+import akashi.text.ast;
+import akashi.page : Page;
 import gui.article.table : Table;
 
 /// Render a Page's AST into GTK widgets appended to `container`.

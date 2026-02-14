@@ -15,8 +15,8 @@ import gtk.types : Align, Orientation;
 import gtk.widget : Widget;
 
 import gui.conformer.view;
-import wikia.pubchem;
-import wikia.psychonaut : Dosage, DosageResult;
+import akashi.pubchem;
+import akashi.psychonaut : Dosage, DosageResult;
 
 class Infobox : Overlay
 {

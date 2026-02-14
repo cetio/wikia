@@ -10,11 +10,11 @@ import gtk.style_context;
 import gdk.display;
 import gtk.types : STYLE_PROVIDER_PRIORITY_APPLICATION;
 
-import gui.wikia : WikiaWindow;
+import gui.chemica : ChemicaWindow;
 
 immutable string cssPath = "resources/style.css";
 
-class WikiaApp : Application
+class ChemicaApp : Application
 {
 private:
     CssProvider cssProvider;
@@ -34,20 +34,20 @@ private:
     void onActivate()
     {
         applyCss();
-        WikiaWindow window = new WikiaWindow(this);
+        ChemicaWindow window = new ChemicaWindow(this);
         window.present();
     }
 
 public:
     this()
     {
-        super("org.wikia.pubchem", ApplicationFlags.DefaultFlags);
+        super("org.chemica.pubchem", ApplicationFlags.DefaultFlags);
         connectActivate(&onActivate);
     }
 }
 
 void main(string[] args)
 {
-    WikiaApp app = new WikiaApp();
+    ChemicaApp app = new ChemicaApp();
     app.run(args);
 }

@@ -8,7 +8,7 @@ import std.conv : to;
 
 import intuit;
 import infer.config;
-import wikia.page : Page, Section;
+import akashi.page : Page, Section;
 
 private:
 

@@ -9,8 +9,8 @@ import gtk.gesture_click;
 import gtk.types : Orientation, Align;
 
 import gui.article.expander;
-import wikia.page : Page, Section;
-import wikia.psychonaut : getReports, getPagesByTitle;
+import akashi.page : Page, Section;
+import akashi.psychonaut : getReports, getPagesByTitle;
 
 class Reports : Expander
 {

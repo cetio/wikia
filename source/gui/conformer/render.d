@@ -11,7 +11,7 @@ import gui.conformer.camera : Camera;
 import gui.conformer.math : distanceMesh;
 import gui.conformer.view : MoleculeView;
 
-import wikia.pubchem.conformer3d;
+import akashi.pubchem.conformer3d;
 
 private struct DrawCmd
 {

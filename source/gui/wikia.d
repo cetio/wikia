@@ -1,4 +1,4 @@
-module gui.wikia;
+module gui.chemica;
 
 import std.stdio : writeln;
 import std.string : strip;
@@ -14,14 +14,14 @@ import gtk.overlay;
 import gtk.stack;
 import gtk.types : Orientation, Align;
 
-import wikia.pubchem;
-import wikia.psychonaut : DosageResult, getDosage;
+import akashi.pubchem;
+import akashi.psychonaut : DosageResult, getDosage;
 
 import gui.home;
 import gui.article;
 import gui.settings : SettingsView;
 
-class WikiaWindow : ApplicationWindow
+class ChemicaWindow : ApplicationWindow
 {
 private:
     Stack stack;
@@ -33,10 +33,10 @@ private:
     Overlay windowOverlay;
     Label titleLabel;
 
-    static WikiaWindow _instance;
+    static ChemicaWindow _instance;
 
 public:
-    static WikiaWindow instance()
+    static ChemicaWindow instance()
     {
         return _instance;
     }
@@ -47,11 +47,11 @@ public:
         _instance = this;
 
         setDefaultSize(1200, 800);
-        setTitle("Wikia");
+        setTitle("Chemica");
 
         HeaderBar header = new HeaderBar();
         header.showTitleButtons = true;
-        titleLabel = new Label("Wikia");
+        titleLabel = new Label("Chemica");
         header.titleWidget = titleLabel;
         setTitlebar(header);
 
@@ -89,7 +89,7 @@ public:
 
     void goHome()
     {
-        titleLabel.label = "Wikia";
+        titleLabel.label = "Chemica";
         stack.visibleChildName = "home";
         lastSearchCompound = null;
         article.clearArticle();
@@ -122,7 +122,7 @@ public:
                 article.infobox.setDosage(dosage);
             }
             catch (Exception e)
-                writeln("[WikiaWindow] Dosage fetch failed: ", e.msg);
+                writeln("[ChemicaWindow] Dosage fetch failed: ", e.msg);
         });
         dosageThread.start();
     }
@@ -163,7 +163,7 @@ private:
                 home.addSimilarResults(filtered);
             }
             catch (Exception e)
-                writeln("[WikiaWindow] Similarity search failed: ", e.msg);
+                writeln("[ChemicaWindow] Similarity search failed: ", e.msg);
         });
         similarThread.start();
     }
@@ -190,7 +190,7 @@ private:
                 article.infobox.setDosage(dosage);
             }
             catch (Exception e)
-                writeln("[WikiaWindow] Compound navigate failed: ", e.msg);
+                writeln("[ChemicaWindow] Compound navigate failed: ", e.msg);
         });
         navThread.start();
     }

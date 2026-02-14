@@ -24,10 +24,10 @@ import gui.article.expander;
 import gui.article.reports : Reports;
 import gui.conformer.view;
 
-import wikia.pubchem;
-import wikia.page : Page, Section, resolvePage;
-import wikia.text.ast : Document, Node, NodeType;
-import wikia.psychonaut : DosageResult;
+import akashi.pubchem;
+import akashi.page : Page, Section, resolvePage;
+import akashi.text.ast : Document, Node, NodeType;
+import akashi.psychonaut : DosageResult;
 import infer.ease : ease, SectionCallback, HeadingsCallback;
 import infer.resolve : extractCompoundNames;
 import infer.config : config;
@@ -128,9 +128,9 @@ public:
         homeBtn.tooltipText = "Back to home";
         homeBtn.addCssClass("nav-home-button");
         homeBtn.connectClicked(() {
-            import gui.wikia : WikiaWindow;
+            import gui.chemica : ChemicaWindow;
             navHistory = null;
-            WikiaWindow.instance.goHome();
+            ChemicaWindow.instance.goHome();
         });
         homeBtn.halign = Align.End;
         homeBtn.valign = Align.Center;
@@ -170,8 +170,8 @@ public:
         }
         else
         {
-            import gui.wikia : WikiaWindow;
-            WikiaWindow.instance.goHome();
+            import gui.chemica : ChemicaWindow;
+            ChemicaWindow.instance.goHome();
         }
     }
 
@@ -539,8 +539,8 @@ private:
         homeBtn.tooltipText = "Back to home";
         homeBtn.addCssClass("nav-home-button");
         homeBtn.connectClicked(() {
-            import gui.wikia : WikiaWindow;
-            WikiaWindow.instance.goHome();
+            import gui.chemica : ChemicaWindow;
+            ChemicaWindow.instance.goHome();
         });
         homeBtn.halign = Align.End;
         homeBtn.valign = Align.Center;

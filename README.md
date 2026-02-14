@@ -1,45 +1,40 @@
-# Wikia
+# Chemica
 
 > [!NOTE]
-> Future development for Wikia is currently ambiguous. It will likely remain a floating repository for various API integrations and data sources for the foreseeable future.
+> Future development for Chemica is currently ambiguous. It will likely remain a floating repository for various API integrations and data sources for the foreseeable future.
 
-Wikia is a collection of D-based interfaces for accessing diverse public APIs and specialized data sources. It provides structured access to scientific databases, financial markets, and knowledge repositories.
+Chemica is a PubChem wiki app for compounds with integration for Wikipedia, Psychonaut Wiki, PubMed, and PMC. Searches are automatically sources from PubMed, with 3D molecular viewing, chemical properties, identifiers, and more.
 
 ## Features
 
-### Knowledge & Research
+Chemica aims to have a diverse knowledge-set available, sourcing from Wikipedia, Psychonaut Wiki, PubMed, and PMC with support for local AI synthesis to blend information from multiple sources.
+
+Among Chemica's features are:
+
+- **3D molecular view** (small and expanded) with atomic tooltips and full bond visualization.
+- **Chemical properties** (XLogP, MW, formula, charge, energy, etc.)
+- **Chemical identifiers** (SMILES, InChI, InChIKey, CAS, etc.)
+- **Automatic aggregation of dosage information** ROA, bioavailability, and thresholds.
+- **Similarity matching** structural scoring, XLogP, and MW to locate compounds with similar dosage to fill gaps.
+
+### Integrated Knowledge Sources
 - **Wikipedia** - Search, article retrieval, and structured data extraction (PubChem CIDs)
 - **PsychonautWiki** - Specialized wiki access for substance information and Erowid cross-references
-- **NCBI Entrez** - Interface for PubMed, PMC, and PubChem research databases
-
-### Financial & Commodity Data
-- **Yahoo Finance** - Real-time stock quotes and historical market data
-- **Precious Metals** - Spot prices for gold, silver, and other metals via Kitco and Packetizer
-
-### Geospatial
-- **USGS MRDS** - Mineral Resources Data System for mining deposit and geological information
-
-## Quick Start
-
-**Requirements:**
-- D compiler (DMD, LDC, or GDC)
-- `dub` package manager
-
-**Install:**
-Add `wikia` to your `dub.json` or `dub.sdl`:
-```bash
-dub add wikia
-```
+- **PubMed** - Biomedical literature database integration via NCBI Entrez
+- **PMC** - PubMed Central full-text articles and research papers
 
 ## Architecture
 
-- `wikia.wikipedia` - Wikipedia API interaction and parser
-- `wikia.psychonaut` - PsychonautWiki and Erowid data integration
-- `wikia.yahoo` - Yahoo Finance quote retrieval
-- `wikia.entrez` - NCBI research database access
-- `wikia.kitco` / `wikia.packetizer` - Metal price scrapers and APIs
-- `wikia.mrds` - USGS mineral database access
+- `akashi.pubchem` - PubChem API integration.
+- `akashi.wikipedia` - Wikipedia API interaction and parser.
+- `akashi.psychonaut` - PsychonautWiki and Erowid data integration.
+- `akashi.entrez` - NCBI research database access (PubMed, PMC).
+- `akashi.text` - Wikitext and XML parsing utilities.
+- `infer.ease` - AI inference for easing multiple sources.
+- `infer.config` - Configuration for AI inference.
+- `infer.resolve` - Exclusion and suffix based resolution for compounds.
+- `gui` - GUI for Chemica using GTK.
 
 ## License
 
-Wikia is licensed under the [AGPL-3.0 license](LICENSE.txt).
+Chemica is licensed under the [AGPL-3.0 license](LICENSE.txt).

@@ -6,7 +6,7 @@ import std.array;
 import gui.conformer.camera;
 import gui.conformer.render : getRadius;
 import gui.conformer.view : MoleculeView;
-import wikia.pubchem.conformer3d;
+import akashi.pubchem.conformer3d;
 
 double[int] distanceMesh(MoleculeView view, double mouseX, double mouseY, int width, int height)
 {

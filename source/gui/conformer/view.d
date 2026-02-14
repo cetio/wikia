@@ -14,8 +14,8 @@ import gui.conformer.camera : Camera;
 import gui.conformer.math : distanceMesh, bondHit, atomHit;
 import gui.conformer.render;
 
-import wikia.pubchem.compound : Compound;
-import wikia.pubchem.conformer3d;
+import akashi.pubchem.compound : Compound;
+import akashi.pubchem.conformer3d;
 
 class MoleculeView : DrawingArea
 {

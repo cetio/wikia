@@ -5,9 +5,10 @@
 	"copyright": "Copyright 2025, cet",
 	"dependencies": {
 		"gid:gtk4": "0.9.8",
-		"intuit": "~>0.3.0"
+		"intuit": "~>0.3.0",
+		"akashi": "*"
 	},
 	"description": ".",
 	"license": "AGPL-3.0-only",
-	"name": "wikia"
+	"name": "chemica"
 }
